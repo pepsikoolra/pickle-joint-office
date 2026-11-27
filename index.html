@@ -109,17 +109,15 @@
     <div class="empty-block" id="chatEmpty">아직 대화가 없습니다. 첫 말을 건네 보세요.</div>
 
     <form class="composer" id="chatForm" autocomplete="off">
-      <div class="composer-row">
-        <span class="composer-label">발신</span>
-        <div class="pill-scroll" id="senderPills"></div>
-      </div>
-      <div class="composer-row">
-        <span class="composer-label">@멘션</span>
-        <div class="pill-scroll" id="mentionPills"></div>
+      <div class="composer-route" id="composerRoute">
+        <span class="route-badge route-from">👑 <b id="routeFromName">Goorm</b><span class="route-sub">(대장님)</span></span>
+        <span class="route-arrow" aria-hidden="true">→</span>
+        <span class="route-badge route-to"><span id="routeToEmoji">🫧</span> <b id="routeToName">@goorma_1</b><span class="route-sub">에게 지시</span></span>
+        <button type="button" class="route-add" id="composerAddStaff">＋ 비서 추가</button>
       </div>
       <div class="composer-input">
         <label class="sr-only" for="chatInput">메시지</label>
-        <input id="chatInput" type="text" maxlength="500" placeholder="메시지를 입력하세요" />
+        <input id="chatInput" type="text" maxlength="500" placeholder="goorma_1에게 지시할 내용을 입력하세요 (AI 한도량을 보고 나머지 피클에게 나눠 시킵니다)" />
         <button type="submit" class="send-btn" aria-label="보내기">➤</button>
       </div>
     </form>

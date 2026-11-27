@@ -56,6 +56,9 @@ const COMMANDER = {
   commander: true,
 };
 
+// 대장님의 지시는 항상 goorma_1 한 곳으로 모이고, goorma_1이 나머지 피클에게 나눠 준다.
+const TARGET_PICKLE = "goorma_1";
+
 const EMOJIS = ["🫧", "🙂", "🐣", "🦊", "🐼", "🐧", "🐨", "🦉", "🐯", "🐰", "🐳", "🦄",
   "🌸", "💙", "📱", "🍀", "⭐", "🔥", "☕", "📎", "📘", "🎧", "🧭", "🧸"];
 
@@ -153,7 +156,6 @@ const state = {
   connected: false,
   tab: "map",
   channel: "command",
-  senderId: "commander",
   mapStyle: "basic",
   motion: true,
 };
@@ -192,8 +194,10 @@ const els = {
   chatEmpty: $("chatEmpty"),
   chatForm: $("chatForm"),
   chatInput: $("chatInput"),
-  senderPills: $("senderPills"),
-  mentionPills: $("mentionPills"),
+  routeFromName: $("routeFromName"),
+  routeToName: $("routeToName"),
+  routeToEmoji: $("routeToEmoji"),
+  composerAddStaff: $("composerAddStaff"),
 
   viewTasks: $("view-tasks"),
   taskForm: $("taskForm"),
@@ -931,60 +935,26 @@ function mentionNode(text) {
   return frag;
 }
 
-function senderList() {
-  const members = memberList().map((m) => ({
-    id: m.id, name: m.name, role: m.role || "비서", emoji: m.emoji || "🙂",
-    color: m.color, commander: false,
-  }));
-  return [{ id: "commander", name: state.meta.owner || COMMANDER.name, role: "대장님", emoji: "👑", color: COMMANDER.color, commander: true }, ...members];
+const commanderName = () => state.meta.owner || COMMANDER.name;
+
+function targetPickle() {
+  const member = memberList().find((m) => m.name === TARGET_PICKLE);
+  return { name: TARGET_PICKLE, emoji: member?.emoji || "🫧" };
 }
 
-function currentSender() {
-  return senderList().find((s) => s.id === state.senderId) || senderList()[0];
-}
-
-function renderSenders() {
-  const list = senderList();
-  if (!list.some((s) => s.id === state.senderId)) state.senderId = "commander";
-
-  els.senderPills.replaceChildren();
-  for (const s of list) {
-    const chip = el("button", {
-      type: "button",
-      class: "chip" + (s.id === state.senderId ? " is-active" : ""),
-      text: `${s.emoji} ${s.name}${s.commander ? " (대장님)" : ""}`,
-      on: {
-        click: () => {
-          state.senderId = s.id;
-          renderSenders();
-        },
-      },
-    });
-    els.senderPills.appendChild(chip);
-  }
-  els.senderPills.appendChild(el("button", {
-    type: "button", class: "chip add", text: "＋ 비서 추가",
-    on: { click: () => openStaffEditor(null) },
-  }));
-
-  els.mentionPills.replaceChildren();
-  els.mentionPills.appendChild(el("button", {
-    type: "button", class: "chip mention", text: "@all",
-    on: { click: () => insertMention("all") },
-  }));
-  for (const m of memberList()) {
-    els.mentionPills.appendChild(el("button", {
-      type: "button", class: "chip mention", text: "@" + m.name,
-      on: { click: () => insertMention(m.name) },
-    }));
+// 발신자는 항상 대장님, 받는 곳은 항상 goorma_1 하나뿐인 지시 줄.
+function renderComposerRoute() {
+  const target = targetPickle();
+  if (els.routeFromName) els.routeFromName.textContent = commanderName();
+  if (els.routeToName) els.routeToName.textContent = "@" + target.name;
+  if (els.routeToEmoji) els.routeToEmoji.textContent = target.emoji;
+  if (els.chatInput) {
+    els.chatInput.placeholder = `${target.name}에게 지시할 내용을 입력하세요 (AI 한도량을 보고 나머지 피클에게 나눠 시킵니다)`;
   }
 }
 
-function insertMention(name) {
-  const value = els.chatInput.value;
-  const needsSpace = value && !value.endsWith(" ") ? " " : "";
-  els.chatInput.value = `${value}${needsSpace}@${name} `;
-  els.chatInput.focus();
+if (els.composerAddStaff) {
+  els.composerAddStaff.addEventListener("click", () => openStaffEditor(null));
 }
 
 function renderChat() {
@@ -1001,6 +971,7 @@ function renderChat() {
     const head = el("div", { class: "msg-head" }, [
       el("span", { class: "msg-name", text: m.name || "이름 없음" }),
       m.role ? el("span", { class: "role-badge", text: m.role }) : null,
+      isCommander && m.to ? el("span", { class: "msg-route", text: "→ @" + m.to }) : null,
       el("span", { class: "msg-time", text: fmtTime(m.createdAt) }),
     ]);
 
@@ -1022,16 +993,21 @@ els.chatForm.addEventListener("submit", (event) => {
   event.preventDefault();
   const text = els.chatInput.value.trim();
   if (!text) return;
-  const sender = currentSender();
+  const target = targetPickle();
+  const name = commanderName();
   els.chatInput.value = "";
   push(ref(db, `${base}/channels/${state.channel}/messages`), {
-    uid: sender.id,
+    uid: COMMANDER.uid,
+    senderId: COMMANDER.uid,          // 🤖 업무 배정 감시(check.sh)가 읽는 필드
     byUid: me.uid,
-    name: sender.name,
-    role: sender.role,
-    emoji: sender.emoji,
-    color: sender.color,
-    commander: !!sender.commander,
+    name,
+    senderName: name,
+    role: COMMANDER.role,
+    senderRole: COMMANDER.role,
+    emoji: COMMANDER.emoji,
+    color: COMMANDER.color,
+    commander: true,
+    to: target.name,
     text: text.slice(0, 500),
     createdAt: serverTimestamp(),
   }).catch((err) => {
@@ -1114,13 +1090,12 @@ els.taskForm.addEventListener("submit", (event) => {
   event.preventDefault();
   const title = els.taskTitle.value.trim();
   if (!title) return;
-  const sender = currentSender();
   els.taskTitle.value = "";
   push(tasksRef, {
     title: title.slice(0, 200),
     assignee: els.taskAssignee.value || "",
     status: els.taskStatus.value || "wait",
-    by: sender.commander ? `${sender.name} 대장님` : sender.name,
+    by: `${commanderName()} 대장님`,
     byUid: me.uid,
     createdAt: serverTimestamp(),
   }).catch((err) => {
@@ -1477,11 +1452,10 @@ els.memoForm.addEventListener("submit", (event) => {
   event.preventDefault();
   const text = els.memoInput.value.trim();
   if (!text) return;
-  const sender = currentSender();
   els.memoInput.value = "";
   push(notesRef, {
     text: text.slice(0, 500),
-    name: sender.name,
+    name: commanderName(),
     byUid: me.uid,
     pinned: false,
     createdAt: serverTimestamp(),
@@ -1532,7 +1506,7 @@ els.officeSave.addEventListener("click", () => {
     state.meta = { ...state.meta, title, owner };
     paintHeader();
     renderMap();
-    renderSenders();
+    renderComposerRoute();
     toast("사무실 이름을 저장했습니다");
     closeModal(els.officeModal);
   }).catch(() => toast("저장하지 못했습니다"));
@@ -1579,7 +1553,7 @@ onValue(metaRef, (snap) => {
   state.meta = snap.val() || {};
   paintHeader();
   renderMap();
-  renderSenders();
+  renderComposerRoute();
 }, (err) => console.warn("meta 구독 실패", err));
 
 const seenKey = `goorm.seen.${office}`;
@@ -1608,7 +1582,7 @@ onValue(ref(db, `${base}/members`), (snap) => {
   renderMap();
   renderStaff();
   renderQuota();
-  renderSenders();
+  renderComposerRoute();
   renderAssigneeOptions();
   if (state.tab === "chat") renderChat();
 }, (err) => {
@@ -1643,7 +1617,7 @@ onValue(quotaRef, (snap) => {
 
 paintHeader();
 renderMap();
-renderSenders();
+renderComposerRoute();
 setChannel("command");
 renderTasks();
 renderStaff();
