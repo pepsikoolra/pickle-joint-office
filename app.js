@@ -450,12 +450,20 @@ function workingSVG(color, idx, status, withLegs = false) {
   const legs = withLegs
     ? `<ellipse class="pk-shadow" cx="40" cy="103" rx="20" ry="4" fill="#3a2410" opacity="0.16"/>
   <g class="pk-legs">
-    <rect x="27" y="84" width="10" height="15" rx="5" fill="${c.deep}"/>
-    <rect x="43" y="84" width="10" height="15" rx="5" fill="${c.deep}"/>
-    <ellipse cx="32" cy="99" rx="7" ry="3.4" fill="${c.deep}"/>
-    <ellipse cx="48" cy="99" rx="7" ry="3.4" fill="${c.deep}"/>
+    <g class="pk-leg pk-leg-l"><rect x="27" y="84" width="10" height="15" rx="5" fill="${c.deep}"/><ellipse cx="32" cy="99" rx="7" ry="3.4" fill="${c.deep}"/></g>
+    <g class="pk-leg pk-leg-r"><rect x="43" y="84" width="10" height="15" rx="5" fill="${c.deep}"/><ellipse cx="48" cy="99" rx="7" ry="3.4" fill="${c.deep}"/></g>
   </g>`
     : "";
+
+  // 팔은 어깨를 축으로 따로 움직이는 관절 그룹
+  const arm = (side) => {
+    const x = atWork ? (side === "l" ? 21 : 59) : (side === "l" ? 33 : 47);
+    const y = atWork ? 74 : 76;
+    return `<g class="pk-arm pk-arm-${side}">
+        <ellipse cx="${x}" cy="${y}" rx="6" ry="7.4" fill="${c.body}"/>
+        <ellipse cx="${x}" cy="${y - 4.4}" rx="3.3" ry="2.1" fill="${c.light}" opacity=".55"/>
+      </g>`;
+  };
 
   return `<svg class="pk-svg pk-svg-seat" viewBox="0 0 80 ${withLegs ? 108 : 96}" aria-hidden="true">
   <defs>
@@ -482,22 +490,38 @@ function workingSVG(color, idx, status, withLegs = false) {
     <ellipse cx="52" cy="30" rx="3" ry="2.2" fill="${c.deep}" opacity=".18"/>
     <ellipse cx="46" cy="17" rx="2.6" ry="1.8" fill="${c.light}" opacity=".8"/>
     <ellipse cx="40" cy="66" rx="17" ry="19" fill="${c.tummy}" opacity=".45"/>
-    <g class="pk-eyes">
-      <ellipse cx="30.5" cy="44" rx="7.6" ry="8.6" fill="#fffdf7"/>
-      <ellipse cx="49.5" cy="44" rx="7.6" ry="8.6" fill="#fffdf7"/>
-      <circle cx="31.6" cy="45" r="4.5" fill="#3a291c"/>
-      <circle cx="50.6" cy="45" r="4.5" fill="#3a291c"/>
-      <circle cx="33.2" cy="43.2" r="1.7" fill="#ffffff"/>
-      <circle cx="52.2" cy="43.2" r="1.7" fill="#ffffff"/>
+    <g class="pk-face">
+      <g class="pk-eyes pk-eyes-open">
+        <ellipse cx="30.5" cy="44" rx="7.6" ry="8.6" fill="#fffdf7"/>
+        <ellipse cx="49.5" cy="44" rx="7.6" ry="8.6" fill="#fffdf7"/>
+        <circle cx="31.6" cy="45" r="4.5" fill="#3a291c"/>
+        <circle cx="50.6" cy="45" r="4.5" fill="#3a291c"/>
+        <circle cx="33.2" cy="43.2" r="1.7" fill="#ffffff"/>
+        <circle cx="52.2" cy="43.2" r="1.7" fill="#ffffff"/>
+      </g>
+      <g class="pk-eyes pk-eyes-happy">
+        <path d="M23.6 47 q6.9 -8.4 13.8 0" stroke="#3a291c" stroke-width="2.9" fill="none" stroke-linecap="round"/>
+        <path d="M42.6 47 q6.9 -8.4 13.8 0" stroke="#3a291c" stroke-width="2.9" fill="none" stroke-linecap="round"/>
+      </g>
+      <g class="pk-eyes pk-eyes-focus">
+        <path d="M25.2 39.8 L34.8 44.4 L25.2 49" stroke="#3a291c" stroke-width="2.8" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+        <path d="M54.8 39.8 L45.2 44.4 L54.8 49" stroke="#3a291c" stroke-width="2.8" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+      </g>
+      <ellipse cx="21" cy="55" rx="4.4" ry="2.8" fill="#ee9c86" opacity=".45"/>
+      <ellipse cx="59" cy="55" rx="4.4" ry="2.8" fill="#ee9c86" opacity=".45"/>
+      <g class="pk-mouth pk-mouth-smile">
+        <path d="M36.5 57 q3.5 4.2 7 0" stroke="#5a3a22" stroke-width="2.1" fill="none" stroke-linecap="round"/>
+      </g>
+      <g class="pk-mouth pk-mouth-talk">
+        <path d="M36.7 56.5 h6.6 v2.1 q-3.3 3.7 -6.6 0 Z" fill="#6b4630"/>
+      </g>
+      <g class="pk-mouth pk-mouth-o">
+        <ellipse cx="40" cy="58.4" rx="2.9" ry="3.5" fill="#6b4630"/>
+      </g>
     </g>
-    <ellipse cx="21" cy="55" rx="4.4" ry="2.8" fill="#ee9c86" opacity=".45"/>
-    <ellipse cx="59" cy="55" rx="4.4" ry="2.8" fill="#ee9c86" opacity=".45"/>
-    <path d="M36.5 57 q3.5 4.2 7 0" stroke="#5a3a22" stroke-width="2.1" fill="none" stroke-linecap="round"/>
     ${prop}
-    <g class="pk-arms">
-      <ellipse class="pk-arm pk-arm-l" cx="${atWork ? 21 : 33}" cy="${atWork ? 74 : 76}" rx="6" ry="7.2" fill="${c.body}"/>
-      <ellipse class="pk-arm pk-arm-r" cx="${atWork ? 59 : 47}" cy="${atWork ? 74 : 76}" rx="6" ry="7.2" fill="${c.body}"/>
-    </g>
+    ${arm("l")}
+    ${arm("r")}
   </g>
 </svg>`;
 }
@@ -522,14 +546,18 @@ function restingSVG(color, idx, mode = "sleep") {
   const glow = `pksl-${idx}`;
   const asleep = mode === "sleep" || mode === "music";
   const eyes = asleep
-    ? `<path d="M17.5 37 q4.5 -4.2 9 0" stroke="#43301f" stroke-width="2.2" fill="none" stroke-linecap="round"/>
-       <path d="M31.5 37 q4.5 -4.2 9 0" stroke="#43301f" stroke-width="2.2" fill="none" stroke-linecap="round"/>`
-    : `<ellipse cx="20.5" cy="36" rx="4.8" ry="5.6" fill="#fffdf7"/>
+    ? `<g class="pk-eyes pk-eyes-closed">
+       <path d="M17.5 37 q4.5 -4.2 9 0" stroke="#43301f" stroke-width="2.2" fill="none" stroke-linecap="round"/>
+       <path d="M31.5 37 q4.5 -4.2 9 0" stroke="#43301f" stroke-width="2.2" fill="none" stroke-linecap="round"/>
+     </g>`
+    : `<g class="pk-eyes pk-eyes-open">
+       <ellipse cx="20.5" cy="36" rx="4.8" ry="5.6" fill="#fffdf7"/>
        <ellipse cx="34.5" cy="36" rx="4.8" ry="5.6" fill="#fffdf7"/>
        <circle cx="22" cy="37" r="2.6" fill="#3a291c"/>
        <circle cx="36" cy="37" r="2.6" fill="#3a291c"/>
        <circle cx="22.9" cy="36" r=".9" fill="#fff"/>
-       <circle cx="36.9" cy="36" r=".9" fill="#fff"/>`;
+       <circle cx="36.9" cy="36" r=".9" fill="#fff"/>
+     </g>`;
 
   const mouth = mode === "music"
     ? `<ellipse cx="27.5" cy="46.5" rx="3.4" ry="3.8" fill="#6b4630"/>`
@@ -565,8 +593,8 @@ function restingSVG(color, idx, mode = "sleep") {
         <path d="M52 36.5 L60 38.5" stroke="#c9b59a" stroke-width="1.2"/>
         <path d="M68 34.5 L76 32.5" stroke="#c9b59a" stroke-width="1.2"/>
         <path d="M68 38.5 L76 36.5" stroke="#c9b59a" stroke-width="1.2"/>
-        <ellipse cx="47" cy="40" rx="5.4" ry="6.2" fill="${c.body}"/>
-        <ellipse cx="81" cy="40" rx="5.4" ry="6.2" fill="${c.body}"/>
+        <g class="pk-arm pk-arm-l"><ellipse cx="47" cy="40" rx="5.4" ry="6.2" fill="${c.body}"/></g>
+        <g class="pk-arm pk-arm-r"><ellipse cx="81" cy="40" rx="5.4" ry="6.2" fill="${c.body}"/></g>
       </g>`
     : mode === "phone"
       ? `<g class="pk-phone">
@@ -574,8 +602,8 @@ function restingSVG(color, idx, mode = "sleep") {
           <rect x="51" y="23" width="14" height="23" rx="3.2" fill="#2f333d"/>
           <rect x="53" y="26" width="10" height="16" rx="1.6" fill="#a9d7ff"/>
           <rect x="53" y="26" width="10" height="5" rx="1.6" fill="#cfeaff"/>
-          <ellipse cx="47" cy="42" rx="5" ry="5.6" fill="${c.body}"/>
-          <ellipse cx="67" cy="44" rx="5" ry="5.6" fill="${c.body}"/>
+          <ellipse class="pk-arm pk-arm-l" cx="47" cy="42" rx="5" ry="5.6" fill="${c.body}"/>
+          <ellipse class="pk-arm pk-arm-r pk-thumb" cx="66" cy="43.5" rx="4.8" ry="5.4" fill="${c.body}"/>
         </g>`
       : "";
 
@@ -708,6 +736,9 @@ function updatePickle(node, m, spot, slot, onBed, spare = false) {
   node.dataset.slot = String(slot);
   node.title = `${m.name} · ${st.label}${slot >= 0 ? " · " + SLOT_LABEL(slot) : " · 자리 없음"}`;
   node.style.setProperty("--pk-delay", `${(Math.max(slot, 0) % 6) * 0.42}s`);
+  node.style.setProperty("--pk-breath", `${(2.4 + (Math.max(slot, 0) % 5) * 0.2).toFixed(2)}s`);
+  node.style.setProperty("--pk-face-dur", `${(11.6 + (Math.max(slot, 0) % 3) * 1.4).toFixed(1)}s`);
+  node.style.setProperty("--pk-face-delay", `${((Math.max(slot, 0) % 6) * 1.15).toFixed(2)}s`);
 
   if (node.dataset.walk) return;
 

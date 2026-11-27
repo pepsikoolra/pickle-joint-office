@@ -383,21 +383,100 @@ select { appearance: none; -webkit-appearance: none; padding-right: 30px;
 }
 
 /* 움직임 */
-.map-stage.motion .pk-seat .pk-svg { animation: pk-bob 3.4s ease-in-out infinite; animation-delay: var(--pk-delay, 0s); }
-.map-stage.motion .pk-seat .pk-eyes { animation: pk-blink 5.4s infinite; animation-delay: var(--pk-delay, 0s); }
-.map-stage.motion .pk-seat .pk-ear-l { animation: pk-wiggle-l 3.2s ease-in-out infinite; animation-delay: var(--pk-delay, 0s); }
-.map-stage.motion .pk-seat .pk-ear-r { animation: pk-wiggle-r 3.2s ease-in-out infinite; animation-delay: var(--pk-delay, 0s); }
-.map-stage.motion .pk-seat .pk-arm-r { animation: pk-type .7s ease-in-out infinite; animation-delay: var(--pk-delay, 0s); }
-.map-stage.motion .pk-bed .pk-sleep-body { animation: pk-breathe 4.2s ease-in-out infinite; animation-delay: var(--pk-delay, 0s); }
-.map-stage.motion .pk-bed .pk-blanket { animation: pk-quilt 4.2s ease-in-out infinite; animation-delay: var(--pk-delay, 0s); }
+.map-stage.motion .pk-seat .pk-svg { animation: pk-bob 4.6s ease-in-out infinite; animation-delay: var(--pk-delay, 0s); }
+.map-stage.motion .pk-seat .pk-body { animation: pk-breathe-seat var(--pk-breath, 2.8s) ease-in-out infinite; animation-delay: var(--pk-delay, 0s); }
+.map-stage.motion .pk-seat .pk-face { animation: pk-face-sway 7.4s ease-in-out infinite; animation-delay: var(--pk-face-delay, 0s); }
+.map-stage.motion .pk-seat .pk-ear-l { animation: pk-wiggle-l 3.4s ease-in-out infinite; animation-delay: var(--pk-delay, 0s); }
+.map-stage.motion .pk-seat .pk-ear-r { animation: pk-wiggle-r 3.4s ease-in-out infinite; animation-delay: calc(var(--pk-delay, 0s) + .35s); }
+
+/* 표정 레이어 — 눈 깜빡임 위에 웃는 눈(^ ^) · 집중한 눈(> <) · 입 모양이 번갈아 */
+.pk-eyes-happy, .pk-eyes-focus, .pk-mouth-talk, .pk-mouth-o { opacity: 0; }
+.map-stage.motion .pk-seat .pk-eyes-open {
+  animation: pk-face-open var(--pk-face-dur, 12.4s) linear infinite,
+             pk-blink 5.6s linear infinite;
+  animation-delay: var(--pk-face-delay, 0s), var(--pk-delay, 0s);
+}
+.map-stage.motion .pk-seat .pk-eyes-happy { animation: pk-face-happy var(--pk-face-dur, 12.4s) linear infinite; animation-delay: var(--pk-face-delay, 0s); }
+.map-stage.motion .pk-seat .pk-eyes-focus { animation: pk-face-focus var(--pk-face-dur, 12.4s) linear infinite; animation-delay: var(--pk-face-delay, 0s); }
+.map-stage.motion .pk-seat .pk-mouth-smile { animation: pk-mouth-smile var(--pk-face-dur, 12.4s) linear infinite; animation-delay: var(--pk-face-delay, 0s); }
+.map-stage.motion .pk-seat .pk-mouth-talk { animation: pk-mouth-talk var(--pk-face-dur, 12.4s) linear infinite; animation-delay: var(--pk-face-delay, 0s); }
+.map-stage.motion .pk-seat .pk-mouth-o { animation: pk-mouth-o var(--pk-face-dur, 12.4s) linear infinite; animation-delay: var(--pk-face-delay, 0s); }
+
+/* 팔 — 타이핑 · 손 흔들기 · 가만히 흔들기 */
+.map-stage.motion .pk-seat .pk-arm { transform-box: fill-box; transform-origin: 50% 12%; }
+.map-stage.motion .pk-seat .pk-arm-r { animation: pk-cheer 13.6s ease-in-out infinite; animation-delay: calc(var(--pk-delay, 0s) + 2.4s); }
+.map-stage.motion .pk-seat[data-state="working"] .pk-arm-l,
+.map-stage.motion .pk-seat[data-state="meeting"] .pk-arm-l { animation: pk-tap .56s ease-in-out infinite; animation-delay: var(--pk-delay, 0s); }
+.map-stage.motion .pk-seat[data-state="idle"] .pk-arm-l { animation: pk-arm-sway 4.6s ease-in-out infinite; animation-delay: var(--pk-delay, 0s); }
 
 @keyframes pk-bob {
   0%, 100% { transform: translateY(0); }
-  50% { transform: translateY(-5%); }
+  50% { transform: translateY(-3.2%); }
+}
+@keyframes pk-breathe-seat {
+  0%, 100% { transform: scale(1, 1); }
+  50% { transform: scale(1.04, .968); }
+}
+@keyframes pk-face-sway {
+  0%, 100% { transform: rotate(-2.2deg) translateX(-.5px); }
+  50% { transform: rotate(2.2deg) translateX(.5px); }
 }
 @keyframes pk-blink {
   0%, 92%, 100% { transform: scaleY(1); }
   95% { transform: scaleY(.08); }
+}
+@keyframes pk-face-open {
+  0%, 58% { opacity: 1; }
+  58.01%, 96% { opacity: 0; }
+  96.01%, 100% { opacity: 1; }
+}
+@keyframes pk-face-happy {
+  0%, 58% { opacity: 0; }
+  58.01%, 74% { opacity: 1; }
+  74.01%, 100% { opacity: 0; }
+}
+@keyframes pk-face-focus {
+  0%, 74% { opacity: 0; }
+  74.01%, 96% { opacity: 1; }
+  96.01%, 100% { opacity: 0; }
+}
+@keyframes pk-mouth-smile {
+  0%, 16% { opacity: 1; }
+  16.01%, 28% { opacity: 0; }
+  28.01%, 46% { opacity: 1; }
+  46.01%, 50% { opacity: 0; }
+  50.01%, 58% { opacity: 1; }
+  58.01%, 74% { opacity: 0; }
+  74.01%, 100% { opacity: 1; }
+}
+@keyframes pk-mouth-talk {
+  0%, 16% { opacity: 0; }
+  16.01%, 28% { opacity: 1; }
+  28.01%, 58% { opacity: 0; }
+  58.01%, 74% { opacity: 1; }
+  74.01%, 100% { opacity: 0; }
+}
+@keyframes pk-mouth-o {
+  0%, 46% { opacity: 0; }
+  46.01%, 50% { opacity: 1; }
+  50.01%, 100% { opacity: 0; }
+}
+@keyframes pk-tap {
+  0%, 100% { transform: translateY(0) rotate(0); }
+  50% { transform: translateY(-9%) rotate(-7deg); }
+}
+@keyframes pk-cheer {
+  0%, 52% { transform: rotate(0) translateY(0); }
+  57% { transform: rotate(-10deg); }
+  62%, 76% { transform: rotate(-62deg) translateY(-3%); }
+  66% { transform: rotate(-44deg) translateY(-3%); }
+  71% { transform: rotate(-68deg) translateY(-3%); }
+  82% { transform: rotate(-14deg); }
+  88%, 100% { transform: rotate(0) translateY(0); }
+}
+@keyframes pk-arm-sway {
+  0%, 100% { transform: rotate(2.5deg); }
+  50% { transform: rotate(-3.5deg); }
 }
 @keyframes pk-wiggle-l {
   0%, 100% { transform: rotate(0deg); }
@@ -407,26 +486,47 @@ select { appearance: none; -webkit-appearance: none; padding-right: 30px;
   0%, 100% { transform: rotate(0deg); }
   50% { transform: rotate(7deg); }
 }
-@keyframes pk-type {
-  0%, 100% { transform: translateY(0); }
-  50% { transform: translateY(-6%); }
-}
+
+/* 침대 — 숨쉬기 · 이불 출렁임 */
+.map-stage.motion .pk-bed .pk-sleep-body { animation: pk-breathe var(--pk-breath, 4.2s) ease-in-out infinite; animation-delay: var(--pk-delay, 0s); }
+.map-stage.motion .pk-bed .pk-blanket { animation: pk-quilt var(--pk-breath, 4.2s) ease-in-out infinite; animation-delay: var(--pk-delay, 0s); }
+.map-stage.motion .pk-bed .pk-eyes-open { animation: pk-blink 6.4s linear infinite; animation-delay: var(--pk-delay, 0s); }
+/* 음악 — 고개를 리듬 타며 끄덕 */
+.map-stage.motion .pk-bed[data-pose="music"] .pk-sleep-head { animation: pk-head-bob 2.2s ease-in-out infinite; }
+/* 핸드폰 — 엄지로 톡톡 */
+.map-stage.motion .pk-bed[data-pose="phone"] .pk-thumb { animation: pk-thumb .92s ease-in-out infinite; transform-box: fill-box; transform-origin: 50% 50%; }
+/* 책 — 두 손으로 살짝 들어 올리기 */
+.map-stage.motion .pk-bed[data-pose="read"] .pk-arm-l { animation: pk-hold 3.6s ease-in-out infinite; }
+.map-stage.motion .pk-bed[data-pose="read"] .pk-arm-r { animation: pk-hold 3.6s ease-in-out infinite reverse; }
+
 @keyframes pk-breathe {
   0%, 100% { transform: scale(1); }
-  50% { transform: scale(1.012, 1.03); }
+  50% { transform: scale(1.02, 1.05); }
 }
 @keyframes pk-quilt {
   0%, 100% { transform: translateY(0); }
-  50% { transform: translateY(-2.5%); }
+  50% { transform: translateY(-3%); }
+}
+@keyframes pk-head-bob {
+  0%, 100% { transform: rotate(-5deg) translateY(0); }
+  50% { transform: rotate(5deg) translateY(-1px); }
+}
+@keyframes pk-thumb {
+  0%, 100% { transform: translate(0, 0); }
+  50% { transform: translate(-2.4px, -1.6px); }
+}
+@keyframes pk-hold {
+  0%, 100% { transform: rotate(-3deg); }
+  50% { transform: rotate(4deg); }
 }
 
 /* 걷기 */
 .pk.is-walking { z-index: 60 !important; width: 6.8% !important; transform: translate(-50%, -100%) !important; }
-.map-stage .pk.is-walking .pk-svg { animation: pk-walk-bob .44s ease-in-out infinite; }
-.pk.is-walking .pk-legs rect { animation: pk-step .44s ease-in-out infinite; }
-.pk.is-walking .pk-legs rect:nth-child(2) { animation-delay: .22s; }
-.pk.is-walking .pk-arm-l { animation: pk-swing .44s ease-in-out infinite; }
-.pk.is-walking .pk-arm-r { animation: pk-swing .44s ease-in-out infinite reverse; }
+.map-stage .pk.is-walking .pk-svg { animation: pk-walk-bob .5s ease-in-out infinite; }
+.pk.is-walking .pk-leg { animation: pk-step .5s ease-in-out infinite; }
+.pk.is-walking .pk-leg-r { animation-delay: .25s; }
+.pk.is-walking .pk-arm-l { animation: pk-swing .5s ease-in-out infinite; }
+.pk.is-walking .pk-arm-r { animation: pk-swing .5s ease-in-out infinite reverse; }
 .pk.face-left .pk-svg { --pk-face: -1; transform: scaleX(-1); }
 .pk.is-walking .pk-bubble { opacity: .8; }
 
@@ -435,15 +535,15 @@ select { appearance: none; -webkit-appearance: none; padding-right: 30px;
   50% { transform: translateY(-7%) scaleX(var(--pk-face, 1)); }
 }
 @keyframes pk-step {
-  0%, 100% { transform: rotate(-14deg); }
-  50% { transform: rotate(14deg); }
+  0%, 100% { transform: rotate(-16deg); }
+  50% { transform: rotate(16deg); }
 }
 @keyframes pk-swing {
-  0%, 100% { transform: rotate(-10deg); }
-  50% { transform: rotate(12deg); }
+  0%, 100% { transform: rotate(-14deg); }
+  50% { transform: rotate(16deg); }
 }
 
-.pk.is-walking .pk-legs rect,
+.pk.is-walking .pk-leg,
 .pk.is-walking .pk-arm {
   transform-box: fill-box;
   transform-origin: top center;
@@ -470,15 +570,17 @@ select { appearance: none; -webkit-appearance: none; padding-right: 30px;
 }
 .pk-book { transform-box: fill-box; transform-origin: 50% 80%; }
 
-.pk-seat .pk-eyes,
+.pk-body, .pk-eyes,
 .pk-ear-l, .pk-ear-r,
-.pk-arm-r, .pk-sleep-body, .pk-blanket {
+.pk-arm, .pk-sleep-body, .pk-blanket, .pk-sleep-head {
   transform-box: fill-box;
   transform-origin: center;
 }
+.pk-body { transform-origin: 50% 96%; }
 .pk-ear-l { transform-origin: 100% 50%; }
 .pk-ear-r { transform-origin: 0% 50%; }
 .pk-sleep-body { transform-origin: 30% 60%; }
+.pk-sleep-head { transform-origin: 40% 70%; }
 
 /* ── 피클 말풍선(팝오버) ─────────────────────────── */
 
