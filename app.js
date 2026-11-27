@@ -741,7 +741,7 @@ els.staffSave.addEventListener("click", () => {
     }
   } else {
     update(memberRef(payload.uid), { ...payload, manual: true })
-      .then(() => toast(`${name} 비서를 들였습니다`))
+      .then(() => toast(`${name} 님을 들였습니다`))
       .catch(() => toast("추가하지 못했습니다"));
   }
   closeModal(els.staffModal);
@@ -772,7 +772,7 @@ function renderStaff() {
           el("span", { class: "role-badge", text: m.role || "비서" }),
           el("span", { class: "tag", text: `${ch.emoji} ${ch.name}` }),
           el("span", { class: "status-pill " + st.cls, text: st.label }),
-          present(m) ? el("span", { class: "tag", text: "● 접속 중" }) : null,
+          m.online ? el("span", { class: "tag", text: "● 접속 중" }) : null,
         ]),
       ]),
       el("button", {
@@ -803,17 +803,23 @@ function renderQuota() {
     const fill = el("div", { class: "quota-fill" + (percent >= 85 ? " high" : "") });
     fill.style.width = percent + "%";
 
-    const percentLabel = el("span", { class: "quota-percent", text: percent + "%" });
+    const labelOf = (v) => (v >= 90 ? "한계" : v >= 70 ? "주의" : v >= 40 ? "보통" : "여유");
+    const percentLabel = el("span", { class: "quota-percent", text: `${percent}% · ${labelOf(percent)}` });
 
     const range = el("input", {
       attrs: { type: "range", min: "0", max: "100", step: "5", "aria-label": m.name + " 사용량" },
     });
     range.value = String(percent);
+    const paintRange = (v) => {
+      range.style.background = `linear-gradient(90deg, #b0703a ${v}%, #f1e5d2 ${v}%)`;
+    };
+    paintRange(percent);
     range.addEventListener("input", () => {
       const v = Number(range.value);
-      percentLabel.textContent = v + "%";
+      percentLabel.textContent = `${v}% · ${labelOf(v)}`;
       fill.style.width = v + "%";
       fill.classList.toggle("high", v >= 85);
+      paintRange(v);
     });
     range.addEventListener("change", () => {
       update(ref(db, `${base}/quota/${m.id}`), {
@@ -1021,6 +1027,7 @@ onValue(ref(db, `${base}/members`), (snap) => {
   renderQuota();
   renderSenders();
   renderAssigneeOptions();
+  if (state.tab === "chat") renderChat();
 }, (err) => {
   console.warn("members 구독 실패", err);
   toast("실시간 연결에 문제가 있습니다");
