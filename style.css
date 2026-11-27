@@ -527,6 +527,9 @@ select { appearance: none; -webkit-appearance: none; padding-right: 30px;
 .pk.is-walking .pk-leg-r { animation-delay: .25s; }
 .pk.is-walking .pk-arm-l { animation: pk-swing .5s ease-in-out infinite; }
 .pk.is-walking .pk-arm-r { animation: pk-swing .5s ease-in-out infinite reverse; }
+.map-stage .pk.is-walking .pk-arm-l { animation: pk-swing .5s ease-in-out infinite; }
+.map-stage .pk.is-walking .pk-arm-r { animation: pk-swing .5s ease-in-out infinite reverse; }
+.map-stage .pk.is-walking .pk-arm { transform-origin: 50% 12%; }
 .pk.face-left .pk-svg { --pk-face: -1; transform: scaleX(-1); }
 .pk.is-walking .pk-bubble { opacity: .8; }
 
