@@ -40,7 +40,7 @@
     <div class="banner">
       <span class="banner-tag">👑 <span id="bannerOffice">구름 비서실</span> 본부</span>
       <h2 id="bannerTitle">대장님, 비서 0명이 대기 중이에요</h2>
-      <p>방을 눌러 들어가 보세요. 방마다 비서들이 일하고 있어요.</p>
+      <p>의자에 앉아 일하고, 침대에서 잠드는 피클들을 지켜보세요.</p>
     </div>
 
     <div class="map-toolbar">
@@ -52,28 +52,43 @@
     </div>
 
     <div class="counters">
-      <span class="counter"><span class="dot green"></span><span id="roomCounter">3개 방 가동</span></span>
+      <span class="counter"><span class="dot green"></span><span id="roomCounter">🪑 0/6 자리</span></span>
+      <span class="counter">🛏️ <span id="bedCounter">0/6 침대</span></span>
       <span class="counter">👥 <span id="onlineCounter">ON 0명</span></span>
     </div>
 
     <div class="map-stage" id="mapStage">
-      <img class="map-image" src="office-map.jpg" alt="나무 책상과 회의실, 라운지가 있는 아늑한 비서실 오피스" />
+      <img class="map-image" src="office-map-game.jpg" alt="스틸 테이블과 의자 여섯 개가 있는 작업실, 회색 침대 여섯 개가 있는 침대방이 함께 보이는 미니어처 오피스" />
       <div class="map-grain" aria-hidden="true"></div>
 
-      <button type="button" class="room-badge badge-meeting" data-channel="meeting">
-        🏛️ 대회의실 <span class="badge-count" data-count="meeting">0</span>
-      </button>
-      <button type="button" class="room-badge badge-command" data-channel="command">
-        🎯 지휘실 <span class="badge-count" data-count="command">0</span>
-      </button>
-      <button type="button" class="room-badge badge-lounge" data-channel="lounge">
-        ☕ 라운지 <span class="badge-count" data-count="lounge">0</span>
-      </button>
+      <div class="room-strip">
+        <button type="button" class="room-badge" data-channel="meeting">
+          🏛️ 대회의실 <span class="badge-count" data-count="meeting">0</span>
+        </button>
+        <button type="button" class="room-badge" data-channel="command">
+          🎯 지휘실 <span class="badge-count" data-count="command">0</span>
+        </button>
+        <button type="button" class="room-badge" data-channel="lounge">
+          ☕ 라운지 <span class="badge-count" data-count="lounge">0</span>
+        </button>
+      </div>
 
-      <div class="map-avatars" id="mapAvatars"></div>
+      <div class="room-label label-work">🧵 작업실</div>
+      <div class="room-label label-bed">🛏️ 침대방</div>
+
+      <div class="game-layer" id="gameLayer"></div>
+      <div class="pickle-pop" id="picklePop" hidden></div>
     </div>
 
-    <p class="map-hint">방 배지를 누르면 그 방의 회의실로 들어갑니다.</p>
+    <div class="seed-card" id="seedCard" hidden>
+      <div class="seed-text">
+        <strong>🎮 기본 피클 4명 불러오기</strong>
+        <p>의자에 앉아 일하고 침대에서 잠드는 모습을 한 번에 볼 수 있어요.</p>
+      </div>
+      <button type="button" class="btn brown" id="seedBtn">불러오기</button>
+    </div>
+
+    <p class="map-hint">피클을 누르면 <b>일하러 가기</b> ↔ <b>침대에서 쉬기</b>를 고를 수 있어요. 방 배지는 그 방의 회의실로 이동합니다.</p>
   </section>
 
   <!-- ── 회의실 ────────────────────────────────────── -->
@@ -148,7 +163,7 @@
       <h2>📊 비서현황</h2>
       <button type="button" class="btn small brown" id="addStaffBtn">＋ 비서 추가</button>
     </div>
-    <p class="section-sub">이름·역할·있는 방·상태를 정하면 오피스 맵과 회의실에 바로 반영됩니다.</p>
+    <p class="section-sub">한 사람이 <b>지정된 의자</b>와 <b>지정된 침대</b>를 함께 씁니다. 상태를 바꾸면 맵에서 바로 일하러 가거나 침대에 눕습니다.</p>
     <div class="staff-list" id="staffList"></div>
     <div class="empty-block" id="staffEmpty">아직 등록된 비서가 없습니다. ＋ 비서 추가로 시작해 보세요.</div>
   </section>
@@ -225,13 +240,28 @@
         <label class="field">
           <span class="field-label">상태</span>
           <select id="staffStatus">
-            <option value="idle">대기 중</option>
-            <option value="working">업무 중</option>
-            <option value="meeting">회의 중</option>
-            <option value="rest">휴식 중</option>
+            <option value="idle">대기 중 (의자)</option>
+            <option value="working">업무 중 (의자)</option>
+            <option value="meeting">회의 중 (의자)</option>
+            <option value="rest">휴식 중 (침대)</option>
+            <option value="sleep">수면 중 (침대)</option>
           </select>
         </label>
       </div>
+      <label class="field block">
+        <span class="field-label">지정 자리 · 침대</span>
+        <select id="staffSlot"></select>
+      </label>
+      <label class="field block">
+        <span class="field-label">침대에서 쉴 땐</span>
+        <select id="staffRest">
+          <option value="">자동 (피클마다 다르게)</option>
+          <option value="sleep">💤 잠자기</option>
+          <option value="read">📖 책 읽기</option>
+          <option value="phone">📱 핸드폰 보기</option>
+          <option value="music">🎧 음악 듣기</option>
+        </select>
+      </label>
       <div class="preview">
         <span class="avatar lg" id="staffPreviewAvatar">🙂</span>
         <span class="preview-name" id="staffPreviewName">goorma_1</span>

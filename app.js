@@ -26,11 +26,19 @@ const CHANNELS = [
 ];
 
 const STATUSES = {
-  idle: { label: "대기 중", cls: "s-wait" },
-  working: { label: "업무 중", cls: "s-doing" },
-  meeting: { label: "회의 중", cls: "s-doing" },
-  rest: { label: "휴식 중", cls: "s-wait" },
+  idle: { label: "대기 중", cls: "s-wait", at: "seat", bubble: "✨ 대기 중" },
+  working: { label: "업무 중", cls: "s-doing", at: "seat", bubble: "💻 일하는 중" },
+  meeting: { label: "회의 중", cls: "s-doing", at: "seat", bubble: "💬 회의 중" },
+  rest: { label: "휴식 중", cls: "s-sleep", at: "bed", bubble: "💤 쉬는 중" },
+  sleep: { label: "수면 중", cls: "s-sleep", at: "bed", bubble: "😴 자는 중" },
 };
+
+const REST_MODES = [
+  { id: "sleep", emoji: "💤", label: "잠자기" },
+  { id: "read", emoji: "📖", label: "책 읽기" },
+  { id: "phone", emoji: "📱", label: "핸드폰 보기" },
+  { id: "music", emoji: "🎧", label: "음악 듣기" },
+];
 
 const TASK_STATUS = {
   wait: { label: "대기", cls: "s-wait", next: "doing" },
@@ -119,6 +127,7 @@ let me = {
   color: saved?.color || COLORS[0],
   room: CHANNELS.some((c) => c.id === saved?.room) ? saved.room : "command",
   status: STATUSES[saved?.status] ? saved.status : "idle",
+  restMode: REST_MODES.some((r) => r.id === saved?.restMode) ? saved.restMode : "",
 };
 
 /* ── Firebase ─────────────────────────────────────── */
@@ -168,7 +177,11 @@ const els = {
   roomCounter: $("roomCounter"),
   onlineCounter: $("onlineCounter"),
   mapStage: $("mapStage"),
-  mapAvatars: $("mapAvatars"),
+  gameLayer: $("gameLayer"),
+  picklePop: $("picklePop"),
+  seedCard: $("seedCard"),
+  seedBtn: $("seedBtn"),
+  bedCounter: $("bedCounter"),
 
   viewChat: $("view-chat"),
   channelPills: $("channelPills"),
@@ -218,6 +231,8 @@ const els = {
   staffColors: $("staffColors"),
   staffRoom: $("staffRoom"),
   staffStatus: $("staffStatus"),
+  staffSlot: $("staffSlot"),
+  staffRest: $("staffRest"),
   staffPreviewAvatar: $("staffPreviewAvatar"),
   staffPreviewName: $("staffPreviewName"),
   staffPreviewRole: $("staffPreviewRole"),
@@ -305,7 +320,8 @@ function paintHeader() {
 async function goOnline() {
   const payload = {
     uid: me.uid, name: me.name, role: me.role, emoji: me.emoji, color: me.color,
-    room: me.room, status: me.status, manual: false, online: true, lastSeen: serverTimestamp(),
+    room: me.room, status: me.status, restMode: me.restMode || "",
+    manual: false, online: true, lastSeen: serverTimestamp(),
   };
   try {
     await set(meRef, payload);
@@ -318,7 +334,7 @@ async function goOnline() {
 function pushMe() {
   update(meRef, {
     uid: me.uid, name: me.name, role: me.role, emoji: me.emoji, color: me.color,
-    room: me.room, status: me.status, manual: false, lastSeen: serverTimestamp(),
+    room: me.room, status: me.status, restMode: me.restMode || "", manual: false, lastSeen: serverTimestamp(),
   }).catch((err) => {
     console.warn("프로필 저장 실패", err);
     toast("서버에 저장하지 못했습니다");
@@ -342,11 +358,269 @@ els.tabs.addEventListener("click", (event) => {
 
 /* ── 오피스 맵 ────────────────────────────────────── */
 
-const ROOM_SPOTS = {
-  meeting: [[30, 46], [38, 54], [25, 57], [43, 44], [20, 51]],
-  command: [[55, 24], [63, 29], [48, 23], [60, 36], [52, 40]],
-  lounge: [[66, 69], [74, 73], [82, 69], [70, 79], [78, 79]],
-};
+/* 지도 위 지정 자리(의자 6개)와 지정 침대(6개) 좌표 — office-map-game.jpg 기준 % */
+const SLOT_COUNT = 6;
+const SEATS = [
+  { x: 18.9, y: 41.4 }, { x: 26.6, y: 41.4 }, { x: 34.7, y: 41.4 },
+  { x: 18.9, y: 57.2 }, { x: 26.6, y: 57.2 }, { x: 34.7, y: 57.2 },
+];
+const BEDS = [
+  { x: 57.9, y: 40.4 }, { x: 76.3, y: 40.2 },
+  { x: 58.1, y: 51.2 }, { x: 76.4, y: 50.9 },
+  { x: 58.1, y: 62.4 }, { x: 76.6, y: 61.8 },
+];
+const SPARE_SPOTS = [[23, 67], [29.5, 67.5], [36, 68], [42, 68.5]];
+
+const SLOT_LABEL = (i) => `${i + 1}번 자리 · ${i + 1}번 침대`;
+
+function slotOf(m) {
+  const s = Number(m && m.slot);
+  return Number.isInteger(s) && s >= 0 && s < SLOT_COUNT ? s : -1;
+}
+
+let slotWriting = new Set();
+
+/** 슬롯이 없는 비서에게 빈 자리(낮은 번호부터)를 자동 배정하고 서버에 저장한다. */
+function ensureSlots(members) {
+  const used = new Set();
+  const pending = [];
+  for (const m of members) {
+    const s = slotOf(m);
+    if (s >= 0 && !used.has(s)) used.add(s);
+    else pending.push(m);
+  }
+  for (const m of pending) {
+    let free = 0;
+    while (used.has(free) && free < SLOT_COUNT) free++;
+    if (free >= SLOT_COUNT) break;
+    used.add(free);
+    m.slot = free;
+    if (slotWriting.has(m.id)) continue;
+    slotWriting.add(m.id);
+    update(memberRef(m.id), { slot: free }).catch((err) => {
+      console.warn("자리 배정 실패", err);
+    }).finally(() => slotWriting.delete(m.id));
+  }
+}
+
+/* ── 피클 스프라이트 ──────────────────────────────── */
+
+function hexToRgb(hex) {
+  const h = String(hex || "#a9622a").replace("#", "");
+  return [parseInt(h.slice(0, 2), 16) || 0, parseInt(h.slice(2, 4), 16) || 0, parseInt(h.slice(4, 6), 16) || 0];
+}
+
+function mixHex(hex, target, ratio) {
+  const a = hexToRgb(hex);
+  const b = hexToRgb(target);
+  const out = a.map((v, i) => Math.round(v + (b[i] - v) * ratio));
+  return "#" + out.map((v) => Math.max(0, Math.min(255, v)).toString(16).padStart(2, "0")).join("");
+}
+
+function spriteColors(color) {
+  const body = /^#[0-9a-fA-F]{6}$/.test(String(color || "")) ? color : "#a9622a";
+  return {
+    body,
+    light: mixHex(body, "#ffffff", 0.42),
+    deep: mixHex(body, "#2a1a0e", 0.26),
+    tummy: mixHex(body, "#fff6e2", 0.62),
+    pajA: mixHex(body, "#ffffff", 0.74),
+    pajB: mixHex(body, "#ffffff", 0.34),
+  };
+}
+
+/** 의자에 앉아 일하는 피클 */
+function workingSVG(color, idx, status) {
+  const c = spriteColors(color);
+  const gid = `pkg-${idx}`;
+  const atWork = status === "working" || status === "meeting";
+  const prop = atWork
+    ? `<g class="pk-prop">
+        <rect x="22" y="63" width="36" height="25" rx="4.2" fill="#f4f7fb" stroke="#c8d2dd" stroke-width="1.2"/>
+        <rect x="24.8" y="65.8" width="30.4" height="19.4" rx="2.4" fill="#dbe7f2"/>
+        <rect x="27.5" y="68.6" width="15" height="2.2" rx="1.1" fill="#a9bccf"/>
+        <rect x="27.5" y="72.6" width="22" height="2.2" rx="1.1" fill="#bccbd9"/>
+        <rect x="27.5" y="76.6" width="11" height="2.2" rx="1.1" fill="#bccbd9"/>
+      </g>`
+    : "";
+  return `<svg class="pk-svg pk-svg-seat" viewBox="0 0 80 108" aria-hidden="true">
+  <defs>
+    <linearGradient id="${gid}" x1="0" y1="0" x2="0.35" y2="1">
+      <stop offset="0" stop-color="${c.light}"/>
+      <stop offset="0.55" stop-color="${c.body}"/>
+      <stop offset="1" stop-color="${c.deep}"/>
+    </linearGradient>
+  </defs>
+  <ellipse class="pk-shadow" cx="40" cy="103" rx="20" ry="4" fill="#3a2410" opacity="0.16"/>
+  <g class="pk-legs">
+    <rect x="27" y="84" width="10" height="15" rx="5" fill="${c.deep}"/>
+    <rect x="43" y="84" width="10" height="15" rx="5" fill="${c.deep}"/>
+    <ellipse cx="32" cy="99" rx="7" ry="3.4" fill="${c.deep}"/>
+    <ellipse cx="48" cy="99" rx="7" ry="3.4" fill="${c.deep}"/>
+  </g>
+  <g class="pk-body">
+    <g class="pk-ear pk-ear-l">
+      <ellipse cx="9" cy="30" rx="9" ry="3.6" transform="rotate(-40 9 30)" fill="${c.light}"/>
+      <ellipse cx="6" cy="38" rx="10" ry="3.6" transform="rotate(-12 6 38)" fill="${c.body}"/>
+      <ellipse cx="8" cy="46" rx="8.6" ry="3.4" transform="rotate(16 8 46)" fill="${c.light}"/>
+    </g>
+    <g class="pk-ear pk-ear-r">
+      <ellipse cx="71" cy="30" rx="9" ry="3.6" transform="rotate(40 71 30)" fill="${c.light}"/>
+      <ellipse cx="74" cy="38" rx="10" ry="3.6" transform="rotate(12 74 38)" fill="${c.body}"/>
+      <ellipse cx="72" cy="46" rx="8.6" ry="3.4" transform="rotate(-16 72 46)" fill="${c.light}"/>
+    </g>
+    <path d="M40 5 C56 5 66 19 66.5 36 C67 50 63 60 65 72 C66.5 84 55 94 40 94 C25 94 13.5 84 15 72 C17 60 13 50 13.5 36 C14 19 24 5 40 5 Z" fill="url(#${gid})"/>
+    <ellipse cx="30" cy="24" rx="3.4" ry="2.4" fill="${c.deep}" opacity=".22"/>
+    <ellipse cx="52" cy="30" rx="3" ry="2.2" fill="${c.deep}" opacity=".18"/>
+    <ellipse cx="46" cy="17" rx="2.6" ry="1.8" fill="${c.light}" opacity=".8"/>
+    <ellipse cx="40" cy="66" rx="17" ry="19" fill="${c.tummy}" opacity=".45"/>
+    <g class="pk-eyes">
+      <ellipse cx="30.5" cy="44" rx="7.6" ry="8.6" fill="#fffdf7"/>
+      <ellipse cx="49.5" cy="44" rx="7.6" ry="8.6" fill="#fffdf7"/>
+      <circle cx="31.6" cy="45" r="4.5" fill="#3a291c"/>
+      <circle cx="50.6" cy="45" r="4.5" fill="#3a291c"/>
+      <circle cx="33.2" cy="43.2" r="1.7" fill="#ffffff"/>
+      <circle cx="52.2" cy="43.2" r="1.7" fill="#ffffff"/>
+    </g>
+    <ellipse cx="21" cy="55" rx="4.4" ry="2.8" fill="#ee9c86" opacity=".45"/>
+    <ellipse cx="59" cy="55" rx="4.4" ry="2.8" fill="#ee9c86" opacity=".45"/>
+    <path d="M36.5 57 q3.5 4.2 7 0" stroke="#5a3a22" stroke-width="2.1" fill="none" stroke-linecap="round"/>
+    ${prop}
+    <g class="pk-arms">
+      <ellipse class="pk-arm pk-arm-l" cx="${atWork ? 21 : 33}" cy="${atWork ? 74 : 76}" rx="6" ry="7.2" fill="${c.body}"/>
+      <ellipse class="pk-arm pk-arm-r" cx="${atWork ? 59 : 47}" cy="${atWork ? 74 : 76}" rx="6" ry="7.2" fill="${c.body}"/>
+    </g>
+  </g>
+</svg>`;
+}
+
+/** 침대에서의 모습 — 잠들었는지, 읽는지, 폰 보는지, 음악 듣는지 */
+function poseOf(m, onBed) {
+  if (!onBed) return m.status === "working" || m.status === "meeting" ? "work" : "idle";
+  if (REST_MODES.some((r) => r.id === m.restMode)) return m.restMode;
+  if (m.status === "sleep") return "sleep";
+  const pool = ["read", "phone", "music"];
+  let hash = 0;
+  for (const ch of String(m.name || "pickle")) hash = (hash + ch.charCodeAt(0)) % 997;
+  return pool[hash % pool.length];
+}
+
+/** 침대에 누운 피클 (잠옷 + 이불) — mode: sleep · read · phone · music */
+function restingSVG(color, idx, mode = "sleep") {
+  const c = spriteColors(color);
+  const gid = `pksg-${idx}`;
+  const pid = `pksp-${idx}`;
+  const did = `pksd-${idx}`;
+  const glow = `pksl-${idx}`;
+  const asleep = mode === "sleep" || mode === "music";
+  const eyes = asleep
+    ? `<path d="M17.5 37 q4.5 -4.2 9 0" stroke="#43301f" stroke-width="2.2" fill="none" stroke-linecap="round"/>
+       <path d="M31.5 37 q4.5 -4.2 9 0" stroke="#43301f" stroke-width="2.2" fill="none" stroke-linecap="round"/>`
+    : `<ellipse cx="20.5" cy="36" rx="4.8" ry="5.6" fill="#fffdf7"/>
+       <ellipse cx="34.5" cy="36" rx="4.8" ry="5.6" fill="#fffdf7"/>
+       <circle cx="22" cy="37" r="2.6" fill="#3a291c"/>
+       <circle cx="36" cy="37" r="2.6" fill="#3a291c"/>
+       <circle cx="22.9" cy="36" r=".9" fill="#fff"/>
+       <circle cx="36.9" cy="36" r=".9" fill="#fff"/>`;
+
+  const mouth = mode === "music"
+    ? `<ellipse cx="27.5" cy="46.5" rx="3.4" ry="3.8" fill="#6b4630"/>`
+    : `<ellipse cx="27.5" cy="47" rx="2.8" ry="2.2" fill="#6b4630"/>`;
+
+  const cap = mode === "sleep"
+    ? `<path d="M11 23 Q7 9 22 5 Q30 8 32 16 Q23 13 20 22 Z" fill="${c.pajB}"/>
+       <circle cx="21" cy="6" r="4" fill="#fff6ea"/>`
+    : "";
+
+  const headset = mode === "music"
+    ? `<g class="pk-headset">
+        <path d="M9 40 Q9 9 27 9 Q45 9 45 40" fill="none" stroke="#54565f" stroke-width="4.2" stroke-linecap="round"/>
+        <rect x="4" y="31" width="10" height="15" rx="5" fill="#43454e"/>
+        <rect x="40" y="31" width="10" height="15" rx="5" fill="#43454e"/>
+        <rect x="6" y="34" width="6" height="9" rx="3" fill="${c.pajA}" opacity=".35"/>
+      </g>`
+    : "";
+
+  const notes = mode === "music"
+    ? `<g class="pk-notes" fill="#8ba0d4">
+        <text class="pk-note n1" x="30" y="12" font-size="12" font-weight="700">♪</text>
+        <text class="pk-note n2" x="44" y="20" font-size="10" font-weight="700">♫</text>
+        <text class="pk-note n3" x="22" y="24" font-size="9" font-weight="700">♪</text>
+      </g>`
+    : "";
+
+  const prop = mode === "read"
+    ? `<g class="pk-book">
+        <path d="M48 27 L64 31 L64 47 L48 43 Z" fill="#fffaf0" stroke="#d3c0a2" stroke-width="1"/>
+        <path d="M64 31 L80 27 L80 43 L64 47 Z" fill="#fffdf7" stroke="#d3c0a2" stroke-width="1"/>
+        <path d="M52 32.5 L60 34.5" stroke="#c9b59a" stroke-width="1.2"/>
+        <path d="M52 36.5 L60 38.5" stroke="#c9b59a" stroke-width="1.2"/>
+        <path d="M68 34.5 L76 32.5" stroke="#c9b59a" stroke-width="1.2"/>
+        <path d="M68 38.5 L76 36.5" stroke="#c9b59a" stroke-width="1.2"/>
+        <ellipse cx="47" cy="40" rx="5.4" ry="6.2" fill="${c.body}"/>
+        <ellipse cx="81" cy="40" rx="5.4" ry="6.2" fill="${c.body}"/>
+      </g>`
+    : mode === "phone"
+      ? `<g class="pk-phone">
+          <circle cx="58" cy="34" r="16" fill="url(#${glow})" opacity=".75"/>
+          <rect x="51" y="23" width="14" height="23" rx="3.2" fill="#2f333d"/>
+          <rect x="53" y="26" width="10" height="16" rx="1.6" fill="#a9d7ff"/>
+          <rect x="53" y="26" width="10" height="5" rx="1.6" fill="#cfeaff"/>
+          <ellipse cx="47" cy="42" rx="5" ry="5.6" fill="${c.body}"/>
+          <ellipse cx="67" cy="44" rx="5" ry="5.6" fill="${c.body}"/>
+        </g>`
+      : "";
+
+  return `<svg class="pk-svg pk-svg-bed" viewBox="0 0 138 80" aria-hidden="true">
+  <defs>
+    <linearGradient id="${gid}" x1="0" y1="0" x2="0.3" y2="1">
+      <stop offset="0" stop-color="${c.light}"/>
+      <stop offset="0.6" stop-color="${c.body}"/>
+      <stop offset="1" stop-color="${c.deep}"/>
+    </linearGradient>
+    <pattern id="${pid}" width="9" height="9" patternUnits="userSpaceOnUse">
+      <rect width="9" height="9" fill="${c.pajA}"/>
+      <rect width="4.2" height="9" fill="${c.pajB}" opacity=".5"/>
+    </pattern>
+    <linearGradient id="${did}" x1="0" y1="0" x2="0.2" y2="1">
+      <stop offset="0" stop-color="#63656e"/>
+      <stop offset="0.45" stop-color="#4b4d56"/>
+      <stop offset="1" stop-color="#393b43"/>
+    </linearGradient>
+    <radialGradient id="${glow}">
+      <stop offset="0" stop-color="#bfe3ff" stop-opacity=".9"/>
+      <stop offset="1" stop-color="#bfe3ff" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+  <ellipse cx="70" cy="72" rx="56" ry="5" fill="#2c1c0e" opacity=".14"/>
+  <g class="pk-sleep-body">
+    <path d="M38 30 C38 24 45 21 56 21 L88 21 C98 21 103 27 103 37 L103 51 C103 61 97 65 88 65 L52 65 C43 65 38 61 38 53 Z" fill="url(#${pid})" stroke="${c.pajB}" stroke-width="1.2"/>
+    <ellipse cx="108" cy="37" rx="7.5" ry="5.2" fill="${c.pajA}" stroke="${c.pajB}" stroke-width="1"/>
+    <ellipse cx="108" cy="52" rx="7.5" ry="5.2" fill="${c.pajA}" stroke="${c.pajB}" stroke-width="1"/>
+    <path class="pk-blanket" d="M54 26 C64 22 76 22 86 23 L98 24 C106 25 108 31 108 41 L108 49 C108 60 102 65 93 65 L62 65 C55 65 52 60 54 50 Z" fill="url(#${did})"/>
+    <path d="M55 28 C66 24 76 24 86 25 L104 27" stroke="#75777f" stroke-width="2.4" fill="none" opacity=".7" stroke-linecap="round"/>
+    <path d="M68 40 Q74 36 82 38" stroke="#61636c" stroke-width="1.6" fill="none" opacity=".45"/>
+    <path d="M78 52 Q86 48 96 50" stroke="#61636c" stroke-width="1.6" fill="none" opacity=".35"/>
+    ${prop}
+    <g class="pk-sleep-head">
+      <g class="pk-ear pk-ear-l">
+        <ellipse cx="10" cy="24" rx="8" ry="3.2" transform="rotate(-52 10 24)" fill="${c.light}"/>
+        <ellipse cx="6" cy="32" rx="9" ry="3.2" transform="rotate(-20 6 32)" fill="${c.body}"/>
+        <ellipse cx="8" cy="40" rx="7.6" ry="3" transform="rotate(14 8 40)" fill="${c.light}"/>
+      </g>
+      <ellipse cx="27" cy="38" rx="19" ry="20" fill="url(#${gid})"/>
+      <path d="M44 31 L52 35 L44 41 Z" fill="${c.pajA}" stroke="${c.pajB}" stroke-width=".8"/>
+      ${eyes}
+      ${mouth}
+      <ellipse cx="13" cy="45" rx="3.6" ry="2.2" fill="#ee9c86" opacity=".4"/>
+      <ellipse cx="41" cy="45" rx="3.6" ry="2.2" fill="#ee9c86" opacity=".4"/>
+      ${cap}
+      ${headset}
+    </g>
+    ${notes}
+  </g>
+</svg>`;
+}
 
 const present = (m) => !!(m && (m.manual || m.online));
 
@@ -354,58 +628,248 @@ function memberList() {
   return Object.entries(state.members).map(([id, m]) => ({ id, ...m })).filter((m) => m && m.name);
 }
 
+function paintPose(node, m, onBed, slot, walking = false) {
+  const st = statusOf(m.status);
+  const pose = walking ? "walk" : poseOf(m, onBed);
+  const idx = slot >= 0 ? slot : 9;
+  node.dataset.pose = pose;
+  node.innerHTML = walking
+    ? workingSVG(m.color, idx, "idle")
+    : onBed
+      ? restingSVG(m.color, idx, pose)
+      : workingSVG(m.color, idx, m.status);
+
+  node.appendChild(el("span", { class: "pk-bubble" }, [
+    el("b", { text: m.name || "피클" }),
+    el("i", { text: walking ? "🚶 이동 중" : st.bubble }),
+  ]));
+  if (!walking && pose === "sleep") {
+    node.appendChild(el("span", { class: "pk-zzz", attrs: { "aria-hidden": "true" } }, [
+      el("i", { text: "z" }), el("i", { text: "z" }), el("i", { text: "z" }),
+    ]));
+  }
+}
+
+/* 의자 ↔ 침대를 걸어서 이동한다 (문 앞을 거쳐 두 구간) */
+const WALK_STEP = 860;
+const WALK_GATE = { x: 47.2, y: 62.5 };
+let walkSeq = 0;
+
+function startWalk(node, m, spot, slot, onBed) {
+  const token = String(++walkSeq);
+  const fromX = parseFloat(node.style.left) || spot.x;
+  const fromY = parseFloat(node.style.top) || spot.y;
+  node.dataset.walk = token;
+  node.dataset.place = onBed ? "bed" : "seat";
+  node.classList.add("is-walking");
+  node.classList.toggle("face-left", spot.x < fromX);
+  paintPose(node, m, onBed, slot, true);
+  node.style.transitionDuration = "0.85s";
+  node.style.zIndex = String(40 + Math.round(Math.max(fromY, spot.y)));
+  node.style.left = WALK_GATE.x + "%";
+  node.style.top = WALK_GATE.y + "%";
+
+  setTimeout(() => {
+    if (!node.isConnected || node.dataset.walk !== token) return;
+    node.classList.toggle("face-left", spot.x < WALK_GATE.x);
+    node.style.left = spot.x + "%";
+    node.style.top = spot.y + "%";
+    setTimeout(() => {
+      if (!node.isConnected || node.dataset.walk !== token) return;
+      node.classList.remove("is-walking", "face-left");
+      node.style.transitionDuration = "";
+      node.style.zIndex = String(20 + Math.round(spot.y));
+      node.dataset.walk = "";
+      paintPose(node, m, onBed, slot);
+    }, WALK_STEP);
+  }, WALK_STEP);
+}
+
+function updatePickle(node, m, spot, slot, onBed, spare = false) {
+  const st = statusOf(m.status);
+  const place = onBed ? "bed" : "seat";
+  const prevPlace = node.dataset.place;
+
+  node.classList.toggle("pk-seat", !onBed);
+  node.classList.toggle("pk-bed", onBed);
+  node.classList.toggle("pk-spare", !!spare);
+  node.classList.toggle("pk-me", m.id === me.uid);
+  node.classList.toggle("is-working", !onBed);
+  node.classList.toggle("is-sleeping", onBed);
+  node.dataset.state = m.status || "idle";
+  node.dataset.slot = String(slot);
+  node.title = `${m.name} · ${st.label}${slot >= 0 ? " · " + SLOT_LABEL(slot) : " · 자리 없음"}`;
+  node.style.setProperty("--pk-delay", `${(Math.max(slot, 0) % 6) * 0.42}s`);
+
+  if (node.dataset.walk) return;
+
+  if (prevPlace && prevPlace !== place) {
+    startWalk(node, m, spot, slot, onBed);
+    return;
+  }
+
+  node.style.left = spot.x + "%";
+  node.style.top = spot.y + "%";
+  node.style.zIndex = String(20 + Math.round(spot.y));
+  node.dataset.place = place;
+  if (node.dataset.pose !== poseOf(m, onBed)) paintPose(node, m, onBed, slot);
+}
+
 function renderMap() {
   const members = memberList();
-  const commander = { ...COMMANDER, uid: "commander", name: state.meta.owner || COMMANDER.name, online: true };
+  ensureSlots(members);
 
-  // 배지 인원
+  // 회의실 배지 인원
   const counts = { meeting: 0, command: 0, lounge: 0 };
   for (const m of members) if (counts[m.room] != null) counts[m.room] += 1;
-  counts.command += 1; // 대장님은 늘 지휘실
   CHANNELS.forEach((c) => {
     const node = document.querySelector(`[data-count="${c.id}"]`);
     if (node) node.textContent = String(counts[c.id] || 0);
   });
 
-  // 카운터
-  els.roomCounter.textContent = `${CHANNELS.length}개 방 가동`;
+  const workingN = members.filter((m) => statusOf(m.status).at === "seat").length;
+  const restingN = members.filter((m) => statusOf(m.status).at === "bed").length;
 
-  const onlineCount = 1 + members.filter((m) => m.manual || m.online).length;
-  els.onlineCounter.textContent = `ON ${onlineCount}명`;
+  els.roomCounter.textContent = `🪑 ${Math.min(workingN, SLOT_COUNT)}/${SLOT_COUNT} 자리`;
+  els.bedCounter.textContent = `${Math.min(restingN, SLOT_COUNT)}/${SLOT_COUNT} 침대`;
+  els.onlineCounter.textContent = `ON ${1 + members.filter((m) => m.manual || m.online).length}명`;
+  els.bannerTitle.textContent = members.length
+    ? (restingN
+      ? `대장님, ${workingN}명이 일하고 ${restingN}명이 쉬고 있어요`
+      : `대장님, ${workingN}명이 일하고 있어요`)
+    : "대장님, 아직 피클이 없어요";
+  els.seedCard.hidden = members.length > 1;
 
-  const waitCount = members.length || 1;
-  els.bannerTitle.textContent = `대장님, 비서 ${waitCount}명이 대기 중이에요`;
+  // 자리 배정 — 같은 번호의 의자와 침대를 함께 쓴다
+  const nodes = new Map();
+  for (const node of [...els.gameLayer.children]) nodes.set(node.dataset.id, node);
+  const used = new Set();
 
-  // 아바타
-  els.mapAvatars.replaceChildren();
-  const byRoom = { meeting: [], command: [commander], lounge: [] };
-  for (const m of members) {
-    const key = byRoom[m.room] ? m.room : "command";
-    byRoom[key].push(m);
-  }
-
-  for (const channel of CHANNELS) {
-    const spots = ROOM_SPOTS[channel.id] || ROOM_SPOTS.command;
-    byRoom[channel.id].slice(0, spots.length).forEach((m, i) => {
-      const [x, y] = spots[i];
-      const isCommander = !!m.commander;
-      const node = el("div", {
-        class: "map-avatar" + (isCommander ? " commander" : "") + (present(m) || isCommander ? "" : " offline"),
-        text: m.emoji || "🙂",
-        style: { left: x + "%", top: y + "%", background: tint(m.color), borderColor: "#fffdf8" },
-        attrs: { title: `${m.name} · ${statusOf(m.status).label}` },
-        on: {
-          click: () => {
-            if (isCommander) return;
-            openStaffEditor(m.id);
-          },
-        },
+  const place = (m, spot, slot, onBed, spare = false) => {
+    used.add(m.id);
+    let node = nodes.get(m.id);
+    if (!node) {
+      node = el("div", { class: "pk" });
+      node.dataset.id = m.id;
+      node.dataset.place = "";
+      node.addEventListener("click", (event) => {
+        event.stopPropagation();
+        const cur = memberList().find((x) => x.id === m.id) || m;
+        openPicklePop(cur, {
+          x: parseFloat(node.style.left) || spot.x,
+          y: parseFloat(node.style.top) || spot.y,
+        }, node.dataset.place === "bed");
       });
-      if (present(m) || isCommander) node.appendChild(el("span", { class: "presence-dot" }));
-      els.mapAvatars.appendChild(node);
-    });
+      els.gameLayer.appendChild(node);
+    }
+    updatePickle(node, m, spot, slot, onBed, spare);
+  };
+
+  const bySlot = new Map();
+  const extras = [];
+  for (const m of members) {
+    const s = slotOf(m);
+    if (s >= 0 && !bySlot.has(s)) bySlot.set(s, m);
+    else extras.push(m);
   }
+
+  for (const [slot, m] of bySlot) {
+    const onBed = statusOf(m.status).at === "bed";
+    place(m, onBed ? BEDS[slot] : SEATS[slot], slot, onBed);
+  }
+  extras.forEach((m, i) => {
+    place(m, SPARE_SPOTS[i % SPARE_SPOTS.length], -1, false, true);
+  });
+
+  for (const [id, node] of nodes) if (!used.has(id)) node.remove();
+  if (popId && !members.some((m) => m.id === popId)) closePicklePop();
 }
+
+/* ── 피클 말풍선 · 빠른 전환 ──────────────────────── */
+
+let popId = null;
+
+function closePicklePop() {
+  popId = null;
+  els.picklePop.hidden = true;
+  els.picklePop.replaceChildren();
+}
+
+function setMemberStatus(id, status) {
+  if (!STATUSES[status]) return;
+  if (id === me.uid) {
+    me = { ...me, status };
+    saveJSON("goorm.profile", me);
+  }
+  update(memberRef(id), { status }).catch(() => toast("상태를 바꾸지 못했습니다"));
+}
+
+function setMemberRest(id, mode) {
+  if (!REST_MODES.some((r) => r.id === mode)) return;
+  const status = mode === "sleep" ? "sleep" : "rest";
+  if (id === me.uid) {
+    me = { ...me, status, restMode: mode };
+    saveJSON("goorm.profile", me);
+  }
+  update(memberRef(id), { status, restMode: mode }).catch(() => toast("상태를 바꾸지 못했습니다"));
+}
+
+function openPicklePop(m, spot, onBed) {
+  const pop = els.picklePop;
+  const st = statusOf(m.status);
+  const slot = slotOf(m);
+  const pose = onBed ? poseOf(m, true) : "";
+  popId = m.id;
+  pop.hidden = false;
+  pop.className = "pickle-pop" + (spot.y < 47 ? " below" : "");
+  pop.style.top = spot.y + "%";
+  pop.style.left = "50%";
+
+  pop.replaceChildren(
+    el("div", { class: "pop-head" }, [
+      el("span", { class: "pop-avatar", text: m.emoji || "🙂", style: { background: tint(m.color) } }),
+      el("div", { class: "pop-title" }, [
+        el("strong", { text: m.name || "피클" }),
+        el("span", { class: "role-badge", text: m.role || "비서" }),
+      ]),
+      el("button", { type: "button", class: "icon-btn pop-close", text: "✕", attrs: { "aria-label": "닫기" }, on: { click: closePicklePop } }),
+    ]),
+    el("div", { class: "pop-meta" }, [
+      el("span", { class: "status-pill " + st.cls, text: st.label }),
+      el("span", { class: "pop-slot", text: slot >= 0 ? SLOT_LABEL(slot) : "빈 자리 없음" }),
+    ]),
+    el("button", {
+      type: "button",
+      class: "pop-act pop-act-work" + (onBed ? "" : " is-on"),
+      text: "💻 일하러 가기",
+      on: { click: () => { setMemberStatus(m.id, "working"); closePicklePop(); } },
+    }),
+    el("div", { class: "pop-rest" }, [
+      el("span", { class: "pop-rest-label", text: "침대에서" }),
+      el("div", { class: "pop-chips" }, REST_MODES.map((r) => el("button", {
+        type: "button",
+        class: "pop-chip" + (onBed && pose === r.id ? " is-on" : ""),
+        text: `${r.emoji} ${r.label}`,
+        attrs: { "data-rest": r.id },
+        on: { click: () => { setMemberRest(m.id, r.id); closePicklePop(); } },
+      }))),
+    ]),
+    el("button", {
+      type: "button", class: "pop-edit", text: "✏️ 정보 수정",
+      on: { click: () => { closePicklePop(); openStaffEditor(m.id); } },
+    }),
+  );
+
+  const stageW = els.mapStage.clientWidth || 720;
+  const popW = pop.getBoundingClientRect().width || (stageW < 620 ? 168 : 200);
+  const half = (popW / 2) / stageW * 100;
+  const x = Math.min(99 - half, Math.max(half, spot.x));
+  pop.style.left = x + "%";
+}
+
+els.mapStage.addEventListener("click", (event) => {
+  if (!event.target.closest(".pk") && !event.target.closest(".pickle-pop")) closePicklePop();
+});
 
 els.mapStyle.addEventListener("click", (event) => {
   const btn = event.target.closest(".pill");
@@ -664,6 +1128,19 @@ els.taskForm.addEventListener("submit", (event) => {
 let staffDraft = null;
 let staffEditingId = null;
 
+function paintSlotOptions(selected) {
+  const chosen = selected == null ? "" : String(selected);
+  els.staffSlot.replaceChildren(el("option", { text: "자동 배정 (빈 자리)", attrs: { value: "" } }));
+  for (let i = 0; i < SLOT_COUNT; i++) {
+    const owner = memberList().find((m) => m.id !== staffEditingId && slotOf(m) === i);
+    els.staffSlot.appendChild(el("option", {
+      text: `${i + 1}번 자리 · ${i + 1}번 침대` + (owner ? ` — ${owner.name}` : " (비어 있음)"),
+      attrs: { value: String(i) },
+    }));
+  }
+  els.staffSlot.value = chosen;
+}
+
 function openStaffEditor(id) {
   staffEditingId = id || null;
   const existing = id ? state.members[id] : null;
@@ -671,14 +1148,18 @@ function openStaffEditor(id) {
     ? {
       name: existing.name || "", role: existing.role || "비서", emoji: existing.emoji || "🙂",
       color: existing.color || COLORS[0], room: existing.room || "command", status: existing.status || "idle",
+      slot: slotOf(existing) >= 0 ? slotOf(existing) : "",
+      restMode: REST_MODES.some((r) => r.id === existing.restMode) ? existing.restMode : "",
     }
-    : { name: "", role: "메인 비서", emoji: "🫧", color: COLORS[0], room: "command", status: "idle" };
+    : { name: "", role: "메인 비서", emoji: "🫧", color: COLORS[0], room: "command", status: "idle", slot: "", restMode: "" };
 
   els.staffModalTitle.textContent = existing ? "비서 정보" : "비서 추가";
   els.staffName.value = staffDraft.name;
   els.staffRole.value = staffDraft.role;
   els.staffRoom.value = staffDraft.room;
   els.staffStatus.value = staffDraft.status;
+  els.staffRest.value = staffDraft.restMode;
+  paintSlotOptions(staffDraft.slot);
   els.staffDelete.hidden = !existing;
   paintStaffDraft();
   openModal(els.staffModal);
@@ -713,12 +1194,14 @@ els.staffName.addEventListener("input", () => { staffDraft.name = els.staffName.
 els.staffRole.addEventListener("input", () => { staffDraft.role = els.staffRole.value; paintStaffDraft(); });
 els.staffRoom.addEventListener("change", () => { staffDraft.room = els.staffRoom.value; });
 els.staffStatus.addEventListener("change", () => { staffDraft.status = els.staffStatus.value; });
+els.staffRest.addEventListener("change", () => { staffDraft.restMode = els.staffRest.value; });
 
 els.addStaffBtn.addEventListener("click", () => openStaffEditor(null));
 
 els.staffSave.addEventListener("click", () => {
   const name = (els.staffName.value || "").trim().slice(0, 24);
   if (!name) { toast("이름을 적어 주세요"); els.staffName.focus(); return; }
+  const wantedSlot = els.staffSlot.value === "" ? -1 : Number(els.staffSlot.value);
   const payload = {
     uid: staffEditingId || newUid(),
     name,
@@ -727,10 +1210,25 @@ els.staffSave.addEventListener("click", () => {
     color: staffDraft.color,
     room: els.staffRoom.value,
     status: els.staffStatus.value,
+    restMode: els.staffRest.value || "",
     lastSeen: serverTimestamp(),
   };
 
   if (staffEditingId) {
+    const mine = slotOf(state.members[staffEditingId]);
+    if (wantedSlot >= 0 && wantedSlot !== mine) {
+      const other = memberList().find((m) => m.id !== staffEditingId && slotOf(m) === wantedSlot);
+      if (other) {
+        if (mine >= 0) update(memberRef(other.id), { slot: mine }).catch(() => {});
+        else {
+          const used = new Set(memberList().filter((m) => m.id !== other.id).map(slotOf));
+          let free = 0;
+          while (used.has(free) && free < SLOT_COUNT) free++;
+          if (free < SLOT_COUNT) update(memberRef(other.id), { slot: free }).catch(() => {});
+        }
+      }
+      payload.slot = wantedSlot;
+    }
     update(memberRef(staffEditingId), payload)
       .then(() => toast("비서 정보를 저장했습니다"))
       .catch(() => toast("저장하지 못했습니다"));
@@ -740,6 +1238,7 @@ els.staffSave.addEventListener("click", () => {
       pushMe();
     }
   } else {
+    if (wantedSlot >= 0) payload.slot = wantedSlot;
     update(memberRef(payload.uid), { ...payload, manual: true })
       .then(() => toast(`${name} 님을 들였습니다`))
       .catch(() => toast("추가하지 못했습니다"));
@@ -761,6 +1260,8 @@ function renderStaff() {
   for (const m of members) {
     const st = statusOf(m.status);
     const ch = channelOf(m.room);
+    const slot = slotOf(m);
+    const resting = st.at === "bed";
     els.staffList.appendChild(el("div", { class: "staff-card" }, [
       avatarNode(m.emoji, m.color, "lg"),
       el("div", { class: "staff-main" }, [
@@ -772,18 +1273,73 @@ function renderStaff() {
           el("span", { class: "role-badge", text: m.role || "비서" }),
           el("span", { class: "tag", text: `${ch.emoji} ${ch.name}` }),
           el("span", { class: "status-pill " + st.cls, text: st.label }),
+          resting ? el("span", { class: "tag", text: (() => {
+            const r = REST_MODES.find((x) => x.id === poseOf(m, true));
+            return r ? `${r.emoji} ${r.label}` : "";
+          })() }) : null,
+          el("span", { class: "tag seat-tag", text: slot >= 0 ? `🪑 ${slot + 1}번 자리 · 🛏️ ${slot + 1}번 침대` : "🪑 자리 없음" }),
           m.online ? el("span", { class: "tag", text: "● 접속 중" }) : null,
         ]),
       ]),
-      el("button", {
-        type: "button", class: "btn small", text: "수정",
-        on: { click: () => openStaffEditor(m.id) },
-      }),
+      el("div", { class: "staff-actions" }, [
+        el("button", {
+          type: "button", class: "btn small" + (resting ? "" : " soft"),
+          text: resting ? "💻 일하기" : "💤 쉬기",
+          attrs: { title: resting ? "의자로 보내기" : "침대에서 쉬게 하기" },
+          on: { click: () => setMemberStatus(m.id, resting ? "working" : "rest") },
+        }),
+        el("button", {
+          type: "button", class: "btn small", text: "수정",
+          on: { click: () => openStaffEditor(m.id) },
+        }),
+      ]),
     ]));
   }
 
   els.staffEmpty.classList.toggle("show", members.length === 0);
 }
+
+/* ── 기본 피클 불러오기 ───────────────────────────── */
+
+const STARTERS = [
+  { name: "라랑이", role: "메인 비서", emoji: "🦊", color: "#a9622a", status: "working" },
+  { name: "꼬망이", role: "회의 담당", emoji: "🐼", color: "#3f6fb5", status: "meeting" },
+  { name: "하선", role: "야간 비서", emoji: "🐰", color: "#8a55b0", status: "sleep" },
+];
+
+let seeding = false;
+let autoSeeded = false;
+
+async function seedStarters(quiet) {
+  if (seeding) return;
+  seeding = true;
+  try {
+    const names = new Set(memberList().map((m) => m.name));
+    const used = new Set(memberList().map((m) => slotOf(m)).filter((s) => s >= 0));
+    let added = 0;
+    for (const s of STARTERS) {
+      if (names.has(s.name)) continue;
+      let free = 0;
+      while (used.has(free) && free < SLOT_COUNT) free++;
+      const id = newUid();
+      const payload = {
+        uid: id, name: s.name, role: s.role, emoji: s.emoji, color: s.color,
+        room: "command", status: s.status, manual: true, lastSeen: serverTimestamp(),
+      };
+      if (free < SLOT_COUNT) { payload.slot = free; used.add(free); }
+      await update(memberRef(id), payload);
+      added += 1;
+    }
+    if (!quiet) toast(added ? "🎮 기본 피클을 불러왔어요" : "이미 기본 피클들이 있어요");
+  } catch (err) {
+    console.warn("기본 피클 불러오기 실패", err);
+    toast("기본 피클을 불러오지 못했습니다");
+  } finally {
+    seeding = false;
+  }
+}
+
+els.seedBtn.addEventListener("click", () => seedStarters(false));
 
 /* ── AI한도 ───────────────────────────────────────── */
 
@@ -1020,8 +1576,24 @@ onValue(metaRef, (snap) => {
   renderSenders();
 }, (err) => console.warn("meta 구독 실패", err));
 
+let firstMembersSnap = true;
+
 onValue(ref(db, `${base}/members`), (snap) => {
-  state.members = snap.val() || {};
+  const raw = snap.val() || {};
+  if (firstMembersSnap) {
+    firstMembersSnap = false;
+    const emptyRoom = Object.keys(raw).length === 0;
+    if (emptyRoom && !autoSeeded && !loadJSON(`goorm.seeded.${office}`, false)) {
+      setTimeout(() => {
+        if (memberList().length <= 1 && !autoSeeded) {
+          autoSeeded = true;
+          saveJSON(`goorm.seeded.${office}`, true);
+          seedStarters(true);
+        }
+      }, 1600);
+    }
+  }
+  state.members = raw;
   renderMap();
   renderStaff();
   renderQuota();
