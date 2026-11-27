@@ -62,8 +62,240 @@ const TARGET_PICKLE = "goorma_1";
 const EMOJIS = ["🫧", "🙂", "🐣", "🦊", "🐼", "🐧", "🐨", "🦉", "🐯", "🐰", "🐳", "🦄",
   "🌸", "💙", "📱", "🍀", "⭐", "🔥", "☕", "📎", "📘", "🎧", "🧭", "🧸"];
 
-const COLORS = ["#a9622a", "#3f6fb5", "#8a55b0", "#c2613a",
-  "#b5843a", "#4a7a8c", "#a34a6a", "#5b6363"];
+const COLORS = ["#6EC6FF", "#a9622a", "#3f6fb5", "#8a55b0", "#c2613a",
+  "#b5843a", "#4a7a8c", "#a34a6a", "#5b6363", "#7CC6FE"];
+
+/* ── 자음 모양 피클 ──────────────────────────────── */
+/* 피클 앱의 '자음(모양)' 외형을 그대로 옮긴다. 몸통은 80×100 상자 안에 두껍고 둥근 장난감 획으로 그린다. */
+
+const CONSONANTS = ["", "ㄱ", "ㄴ", "ㄷ", "ㄹ", "ㅁ", "ㅂ", "ㅅ", "ㅇ", "ㅈ", "ㅊ", "ㅋ", "ㅌ", "ㅍ", "ㅎ"];
+
+const CONSONANT_GLYPHS = {
+  "ㄱ": {
+    strokes: [{ d: "M20 24 H52 V74", w: 30 }],
+    face: { eyes: [29, 23, 47, 23], mouth: [38, 32.5], blush: [[13, 32], [63, 32]] },
+    arms: { l: [8, 42], r: [70, 72] }, hands: [30, 67, 48, 67],
+  },
+  "ㄴ": {
+    strokes: [{ d: "M22 22 V74 H54", w: 28 }],
+    face: { eyes: [45, 74, 61, 74], mouth: [53, 82], blush: [[34, 81], [67, 80]] },
+    arms: { l: [6, 50], r: [70, 74] }, hands: [40, 68, 60, 68],
+  },
+  "ㄷ": {
+    strokes: [{ d: "M54 22 H22 V74 H54", w: 28 }],
+    face: { eyes: [40, 74, 56, 74], mouth: [48, 82], blush: [[14, 81], [64, 81]] },
+    arms: { l: [6, 52], r: [72, 32] }, hands: [34, 68, 50, 68],
+  },
+  "ㄹ": {
+    strokes: [{ d: "M22 20 H50 V44 H26 V68 H56", w: 24 }],
+    face: { eyes: [26, 20, 42, 20], mouth: [34, 28.5], blush: [[12, 28], [56, 28]] },
+    arms: { l: [6, 40], r: [66, 50] }, hands: [30, 66, 48, 66],
+  },
+  "ㅁ": {
+    strokes: [{ rect: [26, 26, 28, 48, 13], w: 22 }],
+    face: { eyes: [31, 26, 49, 26], mouth: [40, 33], blush: [[19, 33], [61, 33]] },
+    arms: { l: [8, 50], r: [72, 50] }, hands: [28, 66, 52, 66],
+  },
+  "ㅂ": {
+    strokes: [
+      { d: "M22 22 V76", w: 18 }, { d: "M58 22 V76", w: 18 },
+      { d: "M22 42 H58", w: 18 }, { d: "M22 62 H58", w: 18 },
+    ],
+    face: { eyes: [34, 42, 48, 42], mouth: [41, 48.5], blush: [[22, 50], [58, 50]] },
+    arms: { l: [7, 40], r: [71, 40] }, hands: [30, 66, 52, 66],
+  },
+  "ㅅ": {
+    strokes: [{ d: "M40 26 L24 76", w: 26 }, { d: "M40 26 L56 76", w: 26 }],
+    face: { eyes: [33, 44, 47, 44], mouth: [40, 56], blush: [[25, 52], [55, 52]] },
+    arms: { l: [12, 54], r: [68, 54] }, hands: [30, 68, 50, 68],
+  },
+  "ㅇ": {
+    strokes: [{ cx: 40, cy: 50, r: 22, w: 22 }],
+    face: { eyes: [28, 36, 52, 36], mouth: [40, 66], blush: [[18, 56], [62, 56]] },
+    arms: { l: [5, 50], r: [75, 50] }, hands: [28, 66, 52, 66],
+  },
+  "ㅈ": {
+    strokes: [{ d: "M20 22 H60", w: 20 }, { d: "M40 30 L24 76", w: 22 }, { d: "M40 30 L56 76", w: 22 }],
+    face: { eyes: [33, 46, 47, 46], mouth: [40, 58], blush: [[22, 52], [58, 52]] },
+    arms: { l: [10, 56], r: [70, 56] }, hands: [30, 68, 50, 68],
+  },
+  "ㅊ": {
+    strokes: [{ d: "M40 10 V20", w: 14 }, { d: "M20 26 H60", w: 18 },
+      { d: "M40 34 L24 78", w: 20 }, { d: "M40 34 L56 78", w: 20 }],
+    face: { eyes: [33, 48, 47, 48], mouth: [40, 58], blush: [[23, 52], [57, 52]] },
+    arms: { l: [10, 56], r: [70, 56] }, hands: [30, 68, 50, 68],
+  },
+  "ㅋ": {
+    strokes: [{ d: "M20 24 H52 V74", w: 28 }, { d: "M20 50 H52", w: 18 }],
+    face: { eyes: [28, 23, 46, 23], mouth: [37, 32.5], blush: [[12, 32], [60, 32]] },
+    arms: { l: [6, 42], r: [70, 72] }, hands: [29, 67, 47, 67],
+  },
+  "ㅌ": {
+    strokes: [{ d: "M56 22 H22 V74 H56", w: 26 }, { d: "M22 48 H56", w: 18 }],
+    face: { eyes: [36, 22, 52, 22], mouth: [44, 30], blush: [[20, 30], [63, 30]] },
+    arms: { l: [6, 44], r: [73, 44] }, hands: [32, 67, 50, 67],
+  },
+  "ㅍ": {
+    strokes: [{ d: "M24 22 V78", w: 16 }, { d: "M56 22 V78", w: 16 },
+      { d: "M24 40 H56", w: 16 }, { d: "M24 64 H56", w: 16 }],
+    face: { eyes: [33, 40, 47, 40], mouth: [40, 64], blush: [[18, 30], [62, 30]] },
+    arms: { l: [10, 28], r: [70, 28] }, hands: [30, 64, 50, 64],
+  },
+  "ㅎ": {
+    strokes: [{ d: "M40 10 V18", w: 12 }, { d: "M26 22 H54", w: 14 }, { cx: 40, cy: 56, r: 20, w: 20 }],
+    face: { eyes: [29, 42, 51, 42], mouth: [40, 74], blush: [[18, 60], [62, 60]] },
+    arms: { l: [7, 56], r: [73, 56] }, hands: [28, 68, 52, 68],
+  },
+};
+
+const consonantOf = (m) => (m && CONSONANT_GLYPHS[m.consonant] ? m.consonant : "");
+
+function consonantStroke(s, paint, extra = "") {
+  const base = `fill="none" ${paint} stroke-linecap="round" stroke-linejoin="round" ${extra}`;
+  if (s.d) return `<path d="${s.d}" stroke-width="${s.w}" ${base}/>`;
+  if (s.rect) {
+    return `<rect x="${s.rect[0]}" y="${s.rect[1]}" width="${s.rect[2]}" height="${s.rect[3]}" rx="${s.rect[4]}" stroke-width="${s.w}" ${base}/>`;
+  }
+  return `<circle cx="${s.cx}" cy="${s.cy}" r="${s.r}" stroke-width="${s.w}" ${base}/>`;
+}
+
+/** 자음 몸통 — 두꺼운 획 + 아래쪽 그림자 + 윗면 광택으로 말랑한 3D 장난감 느낌 */
+function consonantBodySVG(consonant, c, gid) {
+  const g = CONSONANT_GLYPHS[consonant];
+  if (!g) return "";
+  const shade = g.strokes
+    .map((s) => consonantStroke(s, `stroke="${c.deep}"`, 'opacity=".2" transform="translate(2.6,3.4)"'))
+    .join("");
+  const main = g.strokes.map((s) => consonantStroke(s, `stroke="url(#${gid})"`)).join("");
+  const gloss = g.strokes
+    .map((s) => consonantStroke({ ...s, w: Math.max(3, s.w * 0.24) }, 'stroke="#ffffff"',
+      `opacity=".32" transform="translate(${(-s.w * 0.07).toFixed(1)},${(-s.w * 0.3).toFixed(1)})"`))
+    .join("");
+  return `<g class="pk-cons-shade">${shade}</g><g class="pk-cons">${main}</g><g class="pk-cons-gloss">${gloss}</g>`;
+}
+
+/** 자음 얼굴 — 둥근 몸통과 같은 눈·입 레이어(깜빡임·웃는 눈·집중한 눈)를 그대로 쓴다 */
+function consonantFaceSVG(consonant, opts = {}) {
+  const g = CONSONANT_GLYPHS[consonant];
+  if (!g) return "";
+  const [x1, y1, x2, y2] = g.face.eyes;
+  const [mx, my] = g.face.mouth;
+  const blush = (g.face.blush || [])
+    .map(([bx, by]) => `<ellipse cx="${bx}" cy="${by}" rx="4" ry="2.6" fill="#ee9c86" opacity=".4"/>`)
+    .join("");
+
+  const eyes = opts.closed
+    ? `<g class="pk-eyes pk-eyes-closed">
+        <path d="M${x1 - 6} ${y1} q6 5.4 12 0" stroke="#43301f" stroke-width="2.2" fill="none" stroke-linecap="round"/>
+        <path d="M${x2 - 6} ${y2} q6 5.4 12 0" stroke="#43301f" stroke-width="2.2" fill="none" stroke-linecap="round"/>
+      </g>`
+    : `<g class="pk-eyes pk-eyes-open">
+        <ellipse cx="${x1}" cy="${y1}" rx="6.6" ry="7.4" fill="#fffdf7"/>
+        <ellipse cx="${x2}" cy="${y2}" rx="6.6" ry="7.4" fill="#fffdf7"/>
+        <circle cx="${x1 + 1.1}" cy="${y1 + 1}" r="3.9" fill="#3a291c"/>
+        <circle cx="${x2 + 1.1}" cy="${y2 + 1}" r="3.9" fill="#3a291c"/>
+        <circle cx="${x1 + 2.5}" cy="${y1 - 0.9}" r="1.5" fill="#ffffff"/>
+        <circle cx="${x2 + 2.5}" cy="${y2 - 0.9}" r="1.5" fill="#ffffff"/>
+      </g>
+    <g class="pk-eyes pk-eyes-happy">
+      <path d="M${x1 - 6} ${y1 + 1.6} q6 -7.6 12 0" stroke="#3a291c" stroke-width="2.6" fill="none" stroke-linecap="round"/>
+      <path d="M${x2 - 6} ${y2 + 1.6} q6 -7.6 12 0" stroke="#3a291c" stroke-width="2.6" fill="none" stroke-linecap="round"/>
+    </g>
+    <g class="pk-eyes pk-eyes-focus">
+      <path d="M${x1 - 4.6} ${y1 - 4} L${x1 + 4.4} ${y1} L${x1 - 4.6} ${y1 + 4} Z" stroke="#3a291c" stroke-width="2.4" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+      <path d="M${x2 + 4.6} ${y2 - 4} L${x2 - 4.4} ${y2} L${x2 + 4.6} ${y2 + 4} Z" stroke="#3a291c" stroke-width="2.4" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+    </g>`;
+
+  const mouth = opts.closed
+    ? `<ellipse cx="${mx}" cy="${my}" rx="2.7" ry="3.1" fill="#6b4630"/>`
+    : opts.plainMouth
+      ? `<path d="M${mx - 4.2} ${my - 1.2} q4.2 4.2 8.4 0" stroke="#5a3a22" stroke-width="2" fill="none" stroke-linecap="round"/>`
+      : `<g class="pk-mouth pk-mouth-smile">
+        <path d="M${mx - 4.4} ${my - 1.4} q4.4 4.4 8.8 0" stroke="#5a3a22" stroke-width="2.1" fill="none" stroke-linecap="round"/>
+      </g>
+      <g class="pk-mouth pk-mouth-talk">
+        <path d="M${mx - 3.4} ${my - 2} h6.8 v1.6 q-3.4 3.8 -6.8 0 Z" fill="#6b4630"/>
+      </g>
+      <g class="pk-mouth pk-mouth-o">
+        <ellipse cx="${mx}" cy="${my}" rx="2.9" ry="3.3" fill="#6b4630"/>
+      </g>`;
+
+  return `<g class="pk-face">${eyes}${blush}${mouth}</g>`;
+}
+
+let thumbSeq = 0;
+
+/** 자음 썸네일(모달 선택 · 아바타) */
+function consonantThumbSVG(consonant, color) {
+  const g = CONSONANT_GLYPHS[consonant];
+  if (!g) return "";
+  const c = spriteColors(color);
+  const gid = `pkt-${++thumbSeq}`;
+  return `<svg class="cons-mini" viewBox="0 0 80 100" aria-hidden="true">
+  <defs>
+    <linearGradient id="${gid}" x1="0.12" y1="0" x2="0.6" y2="1">
+      <stop offset="0" stop-color="${c.light}"/>
+      <stop offset="0.55" stop-color="${c.body}"/>
+      <stop offset="1" stop-color="${c.deep}"/>
+    </linearGradient>
+  </defs>
+  ${consonantBodySVG(consonant, c, gid)}
+  ${consonantFaceSVG(consonant, { plainMouth: true })}
+</svg>`;
+}
+
+/** 의자에 앉은 자음 피클 */
+function consonantSeatSVG(color, idx, status, withLegs, consonant) {
+  const c = spriteColors(color);
+  const g = CONSONANT_GLYPHS[consonant];
+  const gid = `pkc-${idx}`;
+  const atWork = status === "working" || status === "meeting";
+  const prop = atWork
+    ? `<g class="pk-prop">
+        <rect x="22" y="63" width="36" height="25" rx="4.2" fill="#f4f7fb" stroke="#c8d2dd" stroke-width="1.2"/>
+        <rect x="24.8" y="65.8" width="30.4" height="19.4" rx="2.4" fill="#dbe7f2"/>
+        <rect x="27.5" y="68.6" width="15" height="2.2" rx="1.1" fill="#a9bccf"/>
+        <rect x="27.5" y="72.6" width="22" height="2.2" rx="1.1" fill="#bccbd9"/>
+        <rect x="27.5" y="76.6" width="11" height="2.2" rx="1.1" fill="#bccbd9"/>
+      </g>`
+    : "";
+  const legs = withLegs
+    ? `<ellipse class="pk-shadow" cx="46" cy="103" rx="19" ry="4" fill="#3a2410" opacity="0.16"/>
+  <g class="pk-legs">
+    <g class="pk-leg pk-leg-l"><rect x="42" y="84" width="10" height="15" rx="5" fill="${c.deep}"/><ellipse cx="47" cy="99" rx="7" ry="3.4" fill="${c.deep}"/></g>
+    <g class="pk-leg pk-leg-r"><rect x="54" y="84" width="10" height="15" rx="5" fill="${c.deep}"/><ellipse cx="59" cy="99" rx="7" ry="3.4" fill="${c.deep}"/></g>
+  </g>`
+    : "";
+
+  const [hx1, hy1, hx2, hy2] = g.hands;
+  const arm = (side) => {
+    const [x, y] = atWork
+      ? (side === "l" ? [hx1, hy1] : [hx2, hy2])
+      : g.arms[side];
+    return `<g class="pk-arm pk-arm-${side}">
+        <ellipse cx="${x}" cy="${y}" rx="6" ry="7.2" fill="${c.body}"/>
+        <ellipse cx="${x}" cy="${Number(y) - 4.2}" rx="3.2" ry="2" fill="${c.light}" opacity=".5"/>
+      </g>`;
+  };
+
+  return `<svg class="pk-svg pk-svg-seat" viewBox="0 0 80 ${withLegs ? 108 : 96}" aria-hidden="true">
+  <defs>
+    <linearGradient id="${gid}" x1="0.12" y1="0" x2="0.6" y2="1">
+      <stop offset="0" stop-color="${c.light}"/>
+      <stop offset="0.5" stop-color="${c.body}"/>
+      <stop offset="1" stop-color="${c.deep}"/>
+    </linearGradient>
+  </defs>
+  ${legs}
+  <g class="pk-body">
+    ${consonantBodySVG(consonant, c, gid)}
+    ${consonantFaceSVG(consonant)}
+    ${prop}
+    ${arm("l")}
+    ${arm("r")}
+  </g>
+</svg>`;
+}
 
 const DEFAULT_OFFICE = "main-office";
 
@@ -126,8 +358,9 @@ let me = {
   uid,
   name: saved?.name || "goorma_1",
   role: saved?.role || "메인 비서",
-  emoji: saved?.emoji || "🫧",
-  color: saved?.color || COLORS[0],
+  emoji: saved?.emoji || "🩵",
+  color: saved?.color || "#6EC6FF",
+  consonant: CONSONANT_GLYPHS[saved?.consonant] ? saved.consonant : "ㄱ",
   room: CHANNELS.some((c) => c.id === saved?.room) ? saved.room : "command",
   status: STATUSES[saved?.status] ? saved.status : "idle",
   restMode: REST_MODES.some((r) => r.id === saved?.restMode) ? saved.restMode : "",
@@ -233,6 +466,7 @@ const els = {
   staffRole: $("staffRole"),
   staffEmojis: $("staffEmojis"),
   staffColors: $("staffColors"),
+  staffConsonants: $("staffConsonants"),
   staffRoom: $("staffRoom"),
   staffStatus: $("staffStatus"),
   staffSlot: $("staffSlot"),
@@ -289,8 +523,10 @@ function tint(color) {
   return `color-mix(in srgb, ${color || "#c9a87c"} 20%, #fffdf8)`;
 }
 
-function avatarNode(emoji, color, cls = "", online = null) {
-  const node = el("span", { class: "avatar " + cls, text: emoji || "🙂", style: { background: tint(color) } });
+function avatarNode(emoji, color, cls = "", online = null, consonant = "") {
+  const node = el("span", { class: "avatar " + cls, style: { background: tint(color) } });
+  if (CONSONANT_GLYPHS[consonant]) node.innerHTML = consonantThumbSVG(consonant, color);
+  else node.textContent = emoji || "🙂";
   return node;
 }
 
@@ -324,6 +560,7 @@ function paintHeader() {
 async function goOnline() {
   const payload = {
     uid: me.uid, name: me.name, role: me.role, emoji: me.emoji, color: me.color,
+    consonant: me.consonant || "",
     room: me.room, status: me.status, restMode: me.restMode || "",
     manual: false, online: true, lastSeen: serverTimestamp(),
   };
@@ -338,6 +575,7 @@ async function goOnline() {
 function pushMe() {
   update(meRef, {
     uid: me.uid, name: me.name, role: me.role, emoji: me.emoji, color: me.color,
+    consonant: me.consonant || "",
     room: me.room, status: me.status, restMode: me.restMode || "", manual: false, lastSeen: serverTimestamp(),
   }).catch((err) => {
     console.warn("프로필 저장 실패", err);
@@ -434,7 +672,8 @@ function spriteColors(color) {
 }
 
 /** 의자에 앉아 일하는 피클 */
-function workingSVG(color, idx, status, withLegs = false) {
+function workingSVG(color, idx, status, withLegs = false, consonant = "") {
+  if (CONSONANT_GLYPHS[consonant]) return consonantSeatSVG(color, idx, status, withLegs, consonant);
   const c = spriteColors(color);
   const gid = `pkg-${idx}`;
   const atWork = status === "working" || status === "meeting";
@@ -538,7 +777,7 @@ function poseOf(m, onBed) {
 }
 
 /** 침대에 누운 피클 (잠옷 + 이불) — mode: sleep · read · phone · music */
-function restingSVG(color, idx, mode = "sleep") {
+function restingSVG(color, idx, mode = "sleep", consonant = "") {
   const c = spriteColors(color);
   const gid = `pksg-${idx}`;
   const pid = `pksp-${idx}`;
@@ -639,17 +878,19 @@ function restingSVG(color, idx, mode = "sleep") {
     <path d="M78 52 Q86 48 96 50" stroke="#61636c" stroke-width="1.6" fill="none" opacity=".35"/>
     ${prop}
     <g class="pk-sleep-head">
-      <g class="pk-ear pk-ear-l">
+      ${CONSONANT_GLYPHS[consonant] ? "" : `<g class="pk-ear pk-ear-l">
         <ellipse cx="10" cy="24" rx="8" ry="3.2" transform="rotate(-52 10 24)" fill="${c.light}"/>
         <ellipse cx="6" cy="32" rx="9" ry="3.2" transform="rotate(-20 6 32)" fill="${c.body}"/>
         <ellipse cx="8" cy="40" rx="7.6" ry="3" transform="rotate(14 8 40)" fill="${c.light}"/>
-      </g>
-      <ellipse cx="27" cy="38" rx="19" ry="20" fill="url(#${gid})"/>
+      </g>`}
+      ${CONSONANT_GLYPHS[consonant]
+        ? `<g class="pk-cons-head" transform="translate(0,9) scale(0.6)">${consonantBodySVG(consonant, c, gid)}${consonantFaceSVG(consonant, { closed: asleep, plainMouth: true })}</g>`
+        : `<ellipse cx="27" cy="38" rx="19" ry="20" fill="url(#${gid})"/>
       <path d="M44 31 L52 35 L44 41 Z" fill="${c.pajA}" stroke="${c.pajB}" stroke-width=".8"/>
       ${eyes}
       ${mouth}
       <ellipse cx="13" cy="45" rx="3.6" ry="2.2" fill="#ee9c86" opacity=".4"/>
-      <ellipse cx="41" cy="45" rx="3.6" ry="2.2" fill="#ee9c86" opacity=".4"/>
+      <ellipse cx="41" cy="45" rx="3.6" ry="2.2" fill="#ee9c86" opacity=".4"/>`}
       ${cap}
       ${headset}
     </g>
@@ -668,12 +909,14 @@ function paintPose(node, m, onBed, slot, walking = false) {
   const st = statusOf(m.status);
   const pose = walking ? "walk" : poseOf(m, onBed);
   const idx = slot >= 0 ? slot : 9;
+  const cons = consonantOf(m);
   node.dataset.pose = pose;
+  node.dataset.cons = cons;
   node.innerHTML = walking
-    ? workingSVG(m.color, idx, "idle", true)
+    ? workingSVG(m.color, idx, "idle", true, cons)
     : onBed
-      ? restingSVG(m.color, idx, pose)
-      : workingSVG(m.color, idx, m.status);
+      ? restingSVG(m.color, idx, pose, cons)
+      : workingSVG(m.color, idx, m.status, false, cons);
 
   node.appendChild(el("span", { class: "pk-bubble" }, [
     el("b", { text: m.name || "피클" }),
@@ -751,7 +994,7 @@ function updatePickle(node, m, spot, slot, onBed, spare = false) {
   node.style.top = spot.y + "%";
   node.style.zIndex = String(20 + Math.round(spot.y));
   node.dataset.place = place;
-  if (node.dataset.pose !== poseOf(m, onBed)) paintPose(node, m, onBed, slot);
+  if (node.dataset.pose !== poseOf(m, onBed) || node.dataset.cons !== consonantOf(m)) paintPose(node, m, onBed, slot);
 }
 
 function renderMap() {
@@ -868,7 +1111,12 @@ function openPicklePop(m, spot, onBed) {
 
   pop.replaceChildren(
     el("div", { class: "pop-head" }, [
-      el("span", { class: "pop-avatar", text: m.emoji || "🙂", style: { background: tint(m.color) } }),
+      (() => {
+        const av = el("span", { class: "pop-avatar", style: { background: tint(m.color) } });
+        if (CONSONANT_GLYPHS[consonantOf(m)]) av.innerHTML = consonantThumbSVG(consonantOf(m), m.color);
+        else av.textContent = m.emoji || "🙂";
+        return av;
+      })(),
       el("div", { class: "pop-title" }, [
         el("strong", { text: m.name || "피클" }),
         el("span", { class: "role-badge", text: m.role || "비서" }),
@@ -1010,7 +1258,7 @@ function renderChat() {
     bubble.appendChild(mentionNode(m.text));
 
     const row = el("div", { class: "msg-row" + (isCommander ? " mine" : "") }, [
-      avatarNode(m.emoji, m.color),
+      avatarNode(m.emoji, m.color, "", null, consonantOf(m)),
       el("div", { class: "msg-main" }, [head, bubble]),
     ]);
     els.chatList.appendChild(row);
@@ -1160,10 +1408,11 @@ function openStaffEditor(id) {
     ? {
       name: existing.name || "", role: existing.role || "비서", emoji: existing.emoji || "🙂",
       color: existing.color || COLORS[0], room: existing.room || "command", status: existing.status || "idle",
+      consonant: consonantOf(existing),
       slot: slotOf(existing) >= 0 ? slotOf(existing) : "",
       restMode: REST_MODES.some((r) => r.id === existing.restMode) ? existing.restMode : "",
     }
-    : { name: "", role: "메인 비서", emoji: "🫧", color: COLORS[0], room: "command", status: "idle", slot: "", restMode: "" };
+    : { name: "", role: "메인 비서", emoji: "🫧", color: "#6EC6FF", consonant: "", room: "command", status: "idle", slot: "", restMode: "" };
 
   els.staffModalTitle.textContent = existing ? "비서 정보" : "비서 추가";
   els.staffName.value = staffDraft.name;
@@ -1179,12 +1428,21 @@ function openStaffEditor(id) {
 }
 
 function paintStaffDraft() {
-  els.staffPreviewAvatar.textContent = staffDraft.emoji;
+  const cons = staffDraft.consonant || "";
+  if (CONSONANT_GLYPHS[cons]) {
+    els.staffPreviewAvatar.innerHTML = consonantThumbSVG(cons, staffDraft.color);
+  } else {
+    els.staffPreviewAvatar.textContent = staffDraft.emoji;
+  }
   els.staffPreviewAvatar.style.background = tint(staffDraft.color);
   els.staffPreviewName.textContent = staffDraft.name || "이름 없음";
   els.staffPreviewRole.textContent = staffDraft.role || "비서";
   els.staffEmojis.querySelectorAll(".emoji-opt").forEach((b) => b.classList.toggle("sel", b.dataset.emoji === staffDraft.emoji));
   els.staffColors.querySelectorAll(".color-opt").forEach((b) => b.classList.toggle("sel", b.dataset.color === staffDraft.color));
+  els.staffConsonants.querySelectorAll(".cons-opt").forEach((b) => {
+    b.classList.toggle("sel", b.dataset.cons === cons);
+    if (b.dataset.cons) b.innerHTML = consonantThumbSVG(b.dataset.cons, staffDraft.color);
+  });
 }
 
 for (const emoji of EMOJIS) {
@@ -1200,6 +1458,18 @@ for (const color of COLORS) {
   b.style.background = color;
   b.addEventListener("click", () => { staffDraft.color = color; paintStaffDraft(); });
   els.staffColors.appendChild(b);
+}
+
+for (const cons of CONSONANTS) {
+  const b = el("button", {
+    type: "button",
+    class: "cons-opt" + (cons ? "" : " cons-opt-base"),
+    text: cons ? "" : "기본",
+    attrs: { "aria-label": cons ? `자음 모양 ${cons}` : "기본 동그란 모양", title: cons ? `자음 모양 ${cons}` : "기본 동그란 모양" },
+  });
+  b.dataset.cons = cons;
+  b.addEventListener("click", () => { staffDraft.consonant = cons; paintStaffDraft(); });
+  els.staffConsonants.appendChild(b);
 }
 
 els.staffName.addEventListener("input", () => { staffDraft.name = els.staffName.value; paintStaffDraft(); });
@@ -1220,6 +1490,7 @@ els.staffSave.addEventListener("click", () => {
     role: (els.staffRole.value || "비서").trim().slice(0, 20) || "비서",
     emoji: staffDraft.emoji,
     color: staffDraft.color,
+    consonant: staffDraft.consonant || "",
     room: els.staffRoom.value,
     status: els.staffStatus.value,
     restMode: els.staffRest.value || "",
@@ -1275,7 +1546,7 @@ function renderStaff() {
     const slot = slotOf(m);
     const resting = st.at === "bed";
     els.staffList.appendChild(el("div", { class: "staff-card" }, [
-      avatarNode(m.emoji, m.color, "lg"),
+      avatarNode(m.emoji, m.color, "lg", null, consonantOf(m)),
       el("div", { class: "staff-main" }, [
         el("div", { class: "staff-name" }, [
           el("span", { text: m.name }),
@@ -1406,7 +1677,7 @@ function renderQuota() {
 
     els.quotaList.appendChild(el("div", { class: "quota-card" }, [
       el("div", { class: "quota-head" }, [
-        avatarNode(m.emoji, m.color),
+        avatarNode(m.emoji, m.color, "", null, consonantOf(m)),
         el("span", { class: "quota-name", text: m.name }),
         percentLabel,
       ]),
