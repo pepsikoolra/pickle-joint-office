@@ -738,9 +738,11 @@ function renderMap() {
   els.bedCounter.textContent = `${Math.min(restingN, SLOT_COUNT)}/${SLOT_COUNT} 침대`;
   els.onlineCounter.textContent = `ON ${1 + members.filter((m) => m.manual || m.online).length}명`;
   els.bannerTitle.textContent = members.length
-    ? (restingN
+    ? (workingN && restingN
       ? `대장님, ${workingN}명이 일하고 ${restingN}명이 쉬고 있어요`
-      : `대장님, ${workingN}명이 일하고 있어요`)
+      : workingN
+        ? `대장님, ${workingN}명이 일하고 있어요`
+        : `대장님, ${restingN}명이 쉬고 있어요`)
     : "대장님, 아직 피클이 없어요";
   els.seedCard.hidden = members.length > 1;
 
@@ -1580,24 +1582,29 @@ onValue(metaRef, (snap) => {
   renderSenders();
 }, (err) => console.warn("meta 구독 실패", err));
 
-let firstMembersSnap = true;
+const seenKey = `goorm.seen.${office}`;
+const firstVisitOffice = !loadJSON(seenKey, false);
+if (firstVisitOffice) saveJSON(seenKey, true);
+let autoSeedQueued = false;
+
+function queueAutoSeed() {
+  if (autoSeedQueued || autoSeeded || !firstVisitOffice) return;
+  if (loadJSON(`goorm.seeded.${office}`, false)) return;
+  if (memberList().length > 1) return;
+  autoSeedQueued = true;
+  setTimeout(() => {
+    if (autoSeeded) return;
+    if (memberList().length > 1) return;   // 그 사이 다른 피클이 들어옴
+    autoSeeded = true;
+    saveJSON(`goorm.seeded.${office}`, true);
+    seedStarters(true);
+  }, 2200);
+}
 
 onValue(ref(db, `${base}/members`), (snap) => {
   const raw = snap.val() || {};
-  if (firstMembersSnap) {
-    firstMembersSnap = false;
-    const emptyRoom = Object.keys(raw).length === 0;
-    if (emptyRoom && !autoSeeded && !loadJSON(`goorm.seeded.${office}`, false)) {
-      setTimeout(() => {
-        if (memberList().length <= 1 && !autoSeeded) {
-          autoSeeded = true;
-          saveJSON(`goorm.seeded.${office}`, true);
-          seedStarters(true);
-        }
-      }, 1600);
-    }
-  }
   state.members = raw;
+  queueAutoSeed();
   renderMap();
   renderStaff();
   renderQuota();
