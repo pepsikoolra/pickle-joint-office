@@ -1,9 +1,10 @@
 /**
- * 합동 비서실 — 실시간 공용 사무실 (Firebase Realtime Database, Spark 무료 플랜)
+ * 구름 비서실 — 대장님과 비서들이 방마다 실시간으로 함께 일하는 사무실
+ * Firebase Realtime Database (Spark 무료 플랜)
  */
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-app.js";
 import {
-  getDatabase, ref, onValue, update, remove, push, onDisconnect, set, serverTimestamp,
+  getDatabase, ref, onValue, set, update, remove, push, onDisconnect, serverTimestamp,
 } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-database.js";
 
 /* ── 설정 ─────────────────────────────────────────── */
@@ -18,57 +19,71 @@ const firebaseConfig = {
   appId: "1:242570603871:web:426c62667848032ee99aea",
 };
 
-const STATUSES = [
-  { key: "working", label: "업무 중", cls: "st-working" },
-  { key: "idle", label: "대기 중", cls: "st-idle" },
-  { key: "meeting", label: "회의 중", cls: "st-meeting" },
-  { key: "rest", label: "휴식 중", cls: "st-rest" },
+const CHANNELS = [
+  { id: "meeting", emoji: "🏛️", name: "대회의실" },
+  { id: "command", emoji: "🎯", name: "지휘실" },
+  { id: "lounge", emoji: "☕", name: "라운지" },
 ];
 
-const PRIORITIES = {
-  high: { label: "높음", cls: "high", rank: 0 },
-  normal: { label: "보통", cls: "", rank: 1 },
-  low: { label: "낮음", cls: "low", rank: 2 },
+const STATUSES = {
+  idle: { label: "대기 중", cls: "s-wait" },
+  working: { label: "업무 중", cls: "s-doing" },
+  meeting: { label: "회의 중", cls: "s-doing" },
+  rest: { label: "휴식 중", cls: "s-wait" },
 };
 
-const EMOJIS = ["🥒", "🙂", "🐣", "🦊", "🐼", "🐧", "🐨", "🦉", "🐯", "🐰", "🐳", "🦄",
-  "🌱", "🌻", "🍀", "⭐", "🔥", "☕", "📎", "📘", "🎧", "🧭", "🧸", "🍋"];
+const TASK_STATUS = {
+  wait: { label: "대기", cls: "s-wait", next: "doing" },
+  doing: { label: "실행 중", cls: "s-doing", next: "done" },
+  done: { label: "완료", cls: "s-done", next: "wait" },
+};
 
-const COLORS = ["#2f6f4f", "#3f6fb5", "#8a55b0", "#c2613a",
+const COMMANDER = {
+  uid: "commander",
+  name: "Goorm",
+  role: "대장님",
+  emoji: "👑",
+  color: "#c58a3c",
+  room: "command",
+  commander: true,
+};
+
+const EMOJIS = ["🫧", "🙂", "🐣", "🦊", "🐼", "🐧", "🐨", "🦉", "🐯", "🐰", "🐳", "🦄",
+  "🌸", "💙", "📱", "🍀", "⭐", "🔥", "☕", "📎", "📘", "🎧", "🧭", "🧸"];
+
+const COLORS = ["#a9622a", "#3f6fb5", "#8a55b0", "#c2613a",
   "#b5843a", "#4a7a8c", "#a34a6a", "#5b6363"];
 
-const DEFAULT_ROOM = "main-office";
-const DEFAULT_NAME = "goorma_1";
-const MAX_MSG = 1000;
+const DEFAULT_OFFICE = "main-office";
 
-/* ── 방 · 프로필 ───────────────────────────────────── */
+/* ── 사무실 · 내 정보 ─────────────────────────────── */
 
-function normalizeRoom(raw) {
+function normalizeOffice(raw) {
   const v = String(raw || "").toLowerCase().trim()
     .replace(/\s+/g, "-")
     .replace(/[^a-z0-9_-]/g, "-")
     .replace(/-{2,}/g, "-")
     .replace(/^-+|-+$/g, "")
     .slice(0, 40);
-  return v || DEFAULT_ROOM;
+  return v || DEFAULT_OFFICE;
 }
 
-function readRoom() {
+function readOffice() {
   const params = new URLSearchParams(location.search);
-  const q = params.get("room");
-  if (q) return normalizeRoom(q);
+  const q = params.get("office") || params.get("room");
+  if (q) return normalizeOffice(q);
   const hash = location.hash.replace(/^#/, "");
-  const m = hash.match(/(?:^|&)room=([^&]*)/);
-  if (m && m[1]) return normalizeRoom(decodeURIComponent(m[1]));
-  return DEFAULT_ROOM;
+  const m = hash.match(/(?:^|&)(?:office|room)=([^&]*)/);
+  if (m && m[1]) return normalizeOffice(decodeURIComponent(m[1]));
+  return DEFAULT_OFFICE;
 }
 
-const room = readRoom();
+const office = readOffice();
 
-function roomUrl(target) {
+function officeUrl(target) {
   const u = new URL(location.href);
   u.hash = "";
-  u.search = "?room=" + encodeURIComponent(target);
+  u.search = "?office=" + encodeURIComponent(target);
   return u.toString();
 }
 
@@ -76,13 +91,11 @@ function loadJSON(key, fallback) {
   try {
     const raw = localStorage.getItem(key);
     return raw ? JSON.parse(raw) : fallback;
-  } catch {
-    return fallback;
-  }
+  } catch { return fallback; }
 }
 
 function saveJSON(key, value) {
-  try { localStorage.setItem(key, JSON.stringify(value)); } catch { /* 저장 불가 시 무시 */ }
+  try { localStorage.setItem(key, JSON.stringify(value)); } catch { /* 무시 */ }
 }
 
 function newUid() {
@@ -92,18 +105,20 @@ function newUid() {
   return "u" + Math.random().toString(36).slice(2, 12) + Date.now().toString(36);
 }
 
-let uid = loadJSON("pjo.uid", null);
-if (!uid) { uid = newUid(); saveJSON("pjo.uid", uid); }
+let uid = loadJSON("goorm.uid", null);
+if (!uid) { uid = newUid(); saveJSON("goorm.uid", uid); }
 
-const savedProfile = loadJSON("pjo.profile", null);
-const isFirstVisit = !savedProfile || !savedProfile.name;
+const saved = loadJSON("goorm.profile", null);
+const firstVisit = !saved || !saved.name;
 
 let me = {
   uid,
-  name: savedProfile?.name || DEFAULT_NAME,
-  emoji: savedProfile?.emoji || "🙂",
-  color: savedProfile?.color || COLORS[0],
-  status: STATUSES.some((s) => s.key === savedProfile?.status) ? savedProfile.status : "idle",
+  name: saved?.name || "goorma_1",
+  role: saved?.role || "메인 비서",
+  emoji: saved?.emoji || "🫧",
+  color: saved?.color || COLORS[0],
+  room: CHANNELS.some((c) => c.id === saved?.room) ? saved.room : "command",
+  status: STATUSES[saved?.status] ? saved.status : "idle",
 };
 
 /* ── Firebase ─────────────────────────────────────── */
@@ -111,86 +126,131 @@ let me = {
 const app = initializeApp(firebaseConfig);
 const db = getDatabase(app);
 
-const roomPath = "rooms/" + room;
-const meRef = ref(db, `${roomPath}/members/${uid}`);
-const memberRef = (id) => ref(db, `${roomPath}/members/${id}`);
-const messagesRef = ref(db, `${roomPath}/messages`);
-const todosRef = ref(db, `${roomPath}/todos`);
+const base = `rooms/${office}`;
+const meRef = ref(db, `${base}/members/${uid}`);
+const memberRef = (id) => ref(db, `${base}/members/${id}`);
+const metaRef = ref(db, `${base}/meta`);
+const tasksRef = ref(db, `${base}/tasks`);
+const notesRef = ref(db, `${base}/notes`);
+const quotaRef = ref(db, `${base}/quota`);
 
-const state = { members: {}, messages: {}, todos: {}, connected: false };
+const state = {
+  meta: {},
+  members: {},
+  channels: { meeting: {}, command: {}, lounge: {} },
+  tasks: {},
+  notes: {},
+  quota: {},
+  connected: false,
+  tab: "map",
+  channel: "command",
+  senderId: "commander",
+  mapStyle: "basic",
+  motion: true,
+};
 
 /* ── DOM ──────────────────────────────────────────── */
 
 const $ = (id) => document.getElementById(id);
 
 const els = {
-  roomName: $("roomName"),
-  connDot: $("connDot"),
-  copyRoomBtn: $("copyRoomBtn"),
-  meBtn: $("meBtn"),
-  meAvatar: $("meAvatar"),
-  meName: $("meName"),
-  meStatus: $("meStatus"),
+  officeTitle: $("officeTitle"),
+  ownerName: $("ownerName"),
+  connPill: $("connPill"),
+  connText: $("connText"),
+  tabs: $("tabs"),
 
-  members: $("members"),
-  membersEmpty: $("membersEmpty"),
-  memberCount: $("memberCount"),
+  viewMap: $("view-map"),
+  bannerOffice: $("bannerOffice"),
+  bannerTitle: $("bannerTitle"),
+  mapStyle: $("mapStyle"),
+  motionToggle: $("motionToggle"),
+  roomCounter: $("roomCounter"),
+  onlineCounter: $("onlineCounter"),
+  mapStage: $("mapStage"),
+  mapAvatars: $("mapAvatars"),
 
-  msgList: $("msgList"),
-  msgEmpty: $("msgEmpty"),
-  msgCount: $("msgCount"),
-  msgForm: $("msgForm"),
-  msgInput: $("msgInput"),
+  viewChat: $("view-chat"),
+  channelPills: $("channelPills"),
+  chatRoomEmoji: $("chatRoomEmoji"),
+  chatRoomName: $("chatRoomName"),
+  chatOnline: $("chatOnline"),
+  chatList: $("chatList"),
+  chatEmpty: $("chatEmpty"),
+  chatForm: $("chatForm"),
+  chatInput: $("chatInput"),
+  senderPills: $("senderPills"),
+  mentionPills: $("mentionPills"),
 
-  pinnedWrap: $("pinnedWrap"),
+  viewTasks: $("view-tasks"),
+  taskForm: $("taskForm"),
+  taskTitle: $("taskTitle"),
+  taskAssignee: $("taskAssignee"),
+  taskStatus: $("taskStatus"),
+  taskList: $("taskList"),
+  taskEmpty: $("taskEmpty"),
+  taskCount: $("taskCount"),
+
+  viewStaff: $("view-staff"),
+  staffList: $("staffList"),
+  staffEmpty: $("staffEmpty"),
+  addStaffBtn: $("addStaffBtn"),
+
+  viewQuota: $("view-quota"),
+  quotaList: $("quotaList"),
+  quotaEmpty: $("quotaEmpty"),
+  quotaSummary: $("quotaSummary"),
+
+  viewMemo: $("view-memo"),
+  memoForm: $("memoForm"),
+  memoInput: $("memoInput"),
+  memoList: $("memoList"),
+  memoEmpty: $("memoEmpty"),
+  memoCount: $("memoCount"),
+  pinnedBox: $("pinnedBox"),
   pinnedList: $("pinnedList"),
 
-  todoList: $("todoList"),
-  todoEmpty: $("todoEmpty"),
-  todoCount: $("todoCount"),
-  todoForm: $("todoForm"),
-  todoInput: $("todoInput"),
-  todoAssignee: $("todoAssignee"),
-  todoPriority: $("todoPriority"),
+  staffModal: $("staffModal"),
+  staffModalTitle: $("staffModalTitle"),
+  staffName: $("staffName"),
+  staffRole: $("staffRole"),
+  staffEmojis: $("staffEmojis"),
+  staffColors: $("staffColors"),
+  staffRoom: $("staffRoom"),
+  staffStatus: $("staffStatus"),
+  staffPreviewAvatar: $("staffPreviewAvatar"),
+  staffPreviewName: $("staffPreviewName"),
+  staffPreviewRole: $("staffPreviewRole"),
+  staffSave: $("staffSave"),
+  staffDelete: $("staffDelete"),
 
-  profileModal: $("profileModal"),
-  profileName: $("profileName"),
-  emojiGrid: $("emojiGrid"),
-  colorRow: $("colorRow"),
-  statusSeg: $("statusSeg"),
-  profileSave: $("profileSave"),
-  previewAvatar: $("previewAvatar"),
-  previewName: $("previewName"),
-  previewStatus: $("previewStatus"),
-
-  infoModal: $("infoModal"),
-  infoBtn: $("infoBtn"),
-  roomInput: $("roomInput"),
-  roomGo: $("roomGo"),
+  officeModal: $("officeModal"),
+  officeTitleInput: $("officeTitleInput"),
+  officeOwnerInput: $("officeOwnerInput"),
+  roomLink: $("roomLink"),
+  copyLinkBtn: $("copyLinkBtn"),
+  officeSwitchInput: $("officeSwitchInput"),
+  officeSwitchBtn: $("officeSwitchBtn"),
+  officeSave: $("officeSave"),
 
   toast: $("toast"),
 };
 
-/* ── 작은 도우미 ──────────────────────────────────── */
+/* ── 도우미 ───────────────────────────────────────── */
 
 function el(tag, opts = {}, children = []) {
   const node = document.createElement(tag);
   if (opts.class) node.className = opts.class;
+  if (opts.type) node.setAttribute("type", opts.type);
   if (opts.text != null) node.textContent = opts.text;
   if (opts.attrs) {
     for (const [k, v] of Object.entries(opts.attrs)) {
       if (v != null && v !== false) node.setAttribute(k, v === true ? "" : String(v));
     }
   }
-  if (opts.style) {
-    for (const [k, v] of Object.entries(opts.style)) node.style.setProperty(k, v);
-  }
-  if (opts.on) {
-    for (const [k, v] of Object.entries(opts.on)) node.addEventListener(k, v);
-  }
-  for (const child of [].concat(children)) {
-    if (child) node.appendChild(child);
-  }
+  if (opts.style) for (const [k, v] of Object.entries(opts.style)) node.style.setProperty(k, v);
+  if (opts.on) for (const [k, v] of Object.entries(opts.on)) node.addEventListener(k, v);
+  for (const child of [].concat(children)) if (child) node.appendChild(child);
   return node;
 }
 
@@ -199,15 +259,20 @@ function toast(message) {
   els.toast.textContent = message;
   els.toast.classList.add("show");
   clearTimeout(toastTimer);
-  toastTimer = setTimeout(() => els.toast.classList.remove("show"), 2800);
+  toastTimer = setTimeout(() => els.toast.classList.remove("show"), 2600);
 }
 
-function statusOf(key) {
-  return STATUSES.find((s) => s.key === key) || STATUSES[1];
-}
+const statusOf = (key) => STATUSES[key] || STATUSES.idle;
+const taskStatusOf = (key) => TASK_STATUS[key] || TASK_STATUS.wait;
+const channelOf = (id) => CHANNELS.find((c) => c.id === id) || CHANNELS[1];
 
 function tint(color) {
-  return `color-mix(in srgb, ${color || "#8a867e"} 22%, var(--surface-2))`;
+  return `color-mix(in srgb, ${color || "#c9a87c"} 20%, #fffdf8)`;
+}
+
+function avatarNode(emoji, color, cls = "", online = null) {
+  const node = el("span", { class: "avatar " + cls, text: emoji || "🙂", style: { background: tint(color) } });
+  return node;
 }
 
 function fmtTime(ts) {
@@ -217,62 +282,34 @@ function fmtTime(ts) {
   const diff = now.getTime() - d.getTime();
   if (diff < 60 * 1000) return "방금 전";
   if (diff < 60 * 60 * 1000) return Math.floor(diff / 60000) + "분 전";
-
   const timeStr = d.toLocaleTimeString("ko-KR", { hour: "numeric", minute: "2-digit" });
   if (d.toDateString() === now.toDateString()) return timeStr;
-
   const yesterday = new Date(now);
   yesterday.setDate(now.getDate() - 1);
   if (d.toDateString() === yesterday.toDateString()) return "어제 " + timeStr;
-
-  if (diff < 7 * 24 * 3600 * 1000) {
-    return (d.getMonth() + 1) + "월 " + d.getDate() + "일 " + timeStr;
-  }
-  return d.toLocaleDateString("ko-KR", { year: "2-digit", month: "numeric", day: "numeric" });
+  if (diff < 7 * 24 * 3600 * 1000) return `${d.getMonth() + 1}월 ${d.getDate()}일 ${timeStr}`;
+  return d.toLocaleDateString("ko-KR", { month: "numeric", day: "numeric" });
 }
 
-function avatarNode(emoji, color, size = null, online = null) {
-  const node = el("span", {
-    class: "avatar",
-    text: emoji || "🙂",
-    style: { background: tint(color) },
-  });
-  if (size) {
-    node.style.width = size + "px";
-    node.style.height = size + "px";
-    node.style.fontSize = Math.round(size * 0.5) + "px";
-  }
-  if (online !== null) node.appendChild(el("span", { class: "presence" + (online ? " live" : "") }));
-  return node;
+/* ── 내 자리 ──────────────────────────────────────── */
+
+function paintHeader() {
+  const title = state.meta.title || "구름 비서실";
+  const owner = state.meta.owner || "Goorm";
+  els.officeTitle.textContent = title;
+  els.bannerOffice.textContent = title;
+  els.ownerName.textContent = owner;
+  document.title = title;
 }
-
-/* ── 헤더 · 내 정보 ───────────────────────────────── */
-
-function paintMe() {
-  els.roomName.textContent = room;
-  els.meAvatar.textContent = me.emoji;
-  els.meAvatar.style.background = tint(me.color);
-  els.meName.textContent = me.name;
-  els.meStatus.textContent = statusOf(me.status).label;
-  document.title = "합동 비서실 · #" + room;
-}
-
-let onlineRegistered = false;
 
 async function goOnline() {
   const payload = {
-    uid: me.uid,
-    name: me.name,
-    emoji: me.emoji,
-    color: me.color,
-    status: me.status,
-    online: true,
-    lastSeen: serverTimestamp(),
+    uid: me.uid, name: me.name, role: me.role, emoji: me.emoji, color: me.color,
+    room: me.room, status: me.status, manual: false, online: true, lastSeen: serverTimestamp(),
   };
   try {
     await set(meRef, payload);
     await onDisconnect(meRef).update({ online: false, lastSeen: serverTimestamp() });
-    onlineRegistered = true;
   } catch (err) {
     console.warn("자리 알림 실패", err);
   }
@@ -280,332 +317,343 @@ async function goOnline() {
 
 function pushMe() {
   update(meRef, {
-    uid: me.uid,
-    name: me.name,
-    emoji: me.emoji,
-    color: me.color,
-    status: me.status,
-    lastSeen: serverTimestamp(),
+    uid: me.uid, name: me.name, role: me.role, emoji: me.emoji, color: me.color,
+    room: me.room, status: me.status, manual: false, lastSeen: serverTimestamp(),
   }).catch((err) => {
     console.warn("프로필 저장 실패", err);
-    toast("프로필을 서버에 저장하지 못했습니다");
+    toast("서버에 저장하지 못했습니다");
   });
+  saveJSON("goorm.profile", me);
 }
 
-/* ── 구성원 보드 ──────────────────────────────────── */
+/* ── 탭 ───────────────────────────────────────────── */
 
-function renderMembers() {
-  const list = Object.entries(state.members).map(([id, v]) => ({ id, ...v }));
-  list.sort((a, b) => {
-    if ((a.id === me.uid) !== (b.id === me.uid)) return a.id === me.uid ? -1 : 1;
-    if (!!b.online !== !!a.online) return b.online ? 1 : -1;
-    return String(a.name || "").localeCompare(String(b.name || ""), "ko");
+function switchTab(name) {
+  document.querySelectorAll(".tab").forEach((t) => t.classList.toggle("is-active", t.dataset.tab === name));
+  document.querySelectorAll(".view").forEach((v) => v.classList.toggle("is-active", v.dataset.view === name));
+  state.tab = name;
+  window.scrollTo({ top: 0, behavior: "smooth" });
+}
+
+els.tabs.addEventListener("click", (event) => {
+  const tab = event.target.closest(".tab");
+  if (tab) switchTab(tab.dataset.tab);
+});
+
+/* ── 오피스 맵 ────────────────────────────────────── */
+
+const ROOM_SPOTS = {
+  meeting: [[19, 51], [26, 60], [13, 62], [22, 43], [11, 49]],
+  command: [[47, 27], [55, 31], [40, 32], [52, 40], [43, 21]],
+  lounge: [[74, 76], [83, 83], [66, 85], [78, 66], [87, 73]],
+};
+
+const present = (m) => !!(m && (m.manual || m.online));
+
+function memberList() {
+  return Object.entries(state.members).map(([id, m]) => ({ id, ...m })).filter((m) => m && m.name);
+}
+
+function renderMap() {
+  const members = memberList();
+  const commander = { ...COMMANDER, uid: "commander", name: state.meta.owner || COMMANDER.name, online: true };
+
+  // 배지 인원
+  const counts = { meeting: 0, command: 0, lounge: 0 };
+  for (const m of members) if (counts[m.room] != null) counts[m.room] += 1;
+  counts.command += 1; // 대장님은 늘 지휘실
+  CHANNELS.forEach((c) => {
+    const node = document.querySelector(`[data-count="${c.id}"]`);
+    if (node) node.textContent = String(counts[c.id] || 0);
   });
 
-  els.members.replaceChildren();
+  // 카운터
+  const roomsInUse = new Set(members.map((m) => m.room).filter(Boolean));
+  roomsInUse.add("command");
+  els.roomCounter.textContent = `${Math.max(roomsInUse.size, 1)}개 방 가동`;
 
+  const onlineCount = 1 + members.filter((m) => m.manual || m.online).length;
+  els.onlineCounter.textContent = `ON ${onlineCount}명`;
+
+  const waitCount = members.length || 1;
+  els.bannerTitle.textContent = `대장님, 비서 ${waitCount}명이 대기 중이에요`;
+
+  // 아바타
+  els.mapAvatars.replaceChildren();
+  const byRoom = { meeting: [], command: [commander], lounge: [] };
+  for (const m of members) {
+    const key = byRoom[m.room] ? m.room : "command";
+    byRoom[key].push(m);
+  }
+
+  for (const channel of CHANNELS) {
+    const spots = ROOM_SPOTS[channel.id] || ROOM_SPOTS.command;
+    byRoom[channel.id].slice(0, spots.length).forEach((m, i) => {
+      const [x, y] = spots[i];
+      const isCommander = !!m.commander;
+      const node = el("div", {
+        class: "map-avatar" + (isCommander ? " commander" : "") + (present(m) || isCommander ? "" : " offline"),
+        text: m.emoji || "🙂",
+        style: { left: x + "%", top: y + "%", background: tint(m.color), borderColor: "#fffdf8" },
+        attrs: { title: `${m.name} · ${statusOf(m.status).label}` },
+        on: {
+          click: () => {
+            if (isCommander) return;
+            openStaffEditor(m.id);
+          },
+        },
+      });
+      if (present(m) || isCommander) node.appendChild(el("span", { class: "presence-dot" }));
+      els.mapAvatars.appendChild(node);
+    });
+  }
+}
+
+els.mapStyle.addEventListener("click", (event) => {
+  const btn = event.target.closest(".pill");
+  if (!btn) return;
+  state.mapStyle = btn.dataset.style;
+  els.mapStyle.querySelectorAll(".pill").forEach((p) => p.classList.toggle("is-active", p === btn));
+  els.mapStage.classList.toggle("clay", state.mapStyle === "clay");
+});
+
+els.motionToggle.addEventListener("click", () => {
+  state.motion = !state.motion;
+  els.motionToggle.classList.toggle("is-active", state.motion);
+  els.motionToggle.textContent = state.motion ? "✨ 움직임 ON" : "✨ 움직임 OFF";
+  els.mapStage.classList.toggle("motion", state.motion);
+});
+
+document.querySelectorAll(".room-badge").forEach((badge) => {
+  badge.addEventListener("click", () => {
+    setChannel(badge.dataset.channel);
+    switchTab("chat");
+  });
+});
+
+/* ── 회의실 ───────────────────────────────────────── */
+
+function setChannel(id) {
+  const channel = channelOf(id);
+  state.channel = channel.id;
+  els.channelPills.querySelectorAll(".pill").forEach((p) => p.classList.toggle("is-active", p.dataset.channel === channel.id));
+  els.chatRoomEmoji.textContent = channel.emoji;
+  els.chatRoomName.textContent = channel.name;
+  renderChat();
+}
+
+els.channelPills.addEventListener("click", (event) => {
+  const btn = event.target.closest(".pill");
+  if (btn) setChannel(btn.dataset.channel);
+});
+
+function messagesOf(channelId) {
+  const raw = state.channels[channelId] || {};
+  return Object.entries(raw).map(([id, m]) => ({ id, ...m })).sort((a, b) => (a.createdAt || 0) - (b.createdAt || 0));
+}
+
+function mentionNode(text) {
+  const frag = document.createDocumentFragment();
+  const parts = String(text || "").split(/(@[0-9A-Za-z가-힣_]+)/g);
+  for (const part of parts) {
+    if (!part) continue;
+    if (/^@[0-9A-Za-z가-힣_]+$/.test(part)) frag.appendChild(el("span", { class: "mention", text: part }));
+    else frag.appendChild(document.createTextNode(part));
+  }
+  return frag;
+}
+
+function senderList() {
+  const members = memberList().map((m) => ({
+    id: m.id, name: m.name, role: m.role || "비서", emoji: m.emoji || "🙂",
+    color: m.color, commander: false,
+  }));
+  return [{ id: "commander", name: state.meta.owner || COMMANDER.name, role: "대장님", emoji: "👑", color: COMMANDER.color, commander: true }, ...members];
+}
+
+function currentSender() {
+  return senderList().find((s) => s.id === state.senderId) || senderList()[0];
+}
+
+function renderSenders() {
+  const list = senderList();
+  if (!list.some((s) => s.id === state.senderId)) state.senderId = "commander";
+
+  els.senderPills.replaceChildren();
+  for (const s of list) {
+    const chip = el("button", {
+      type: "button",
+      class: "chip" + (s.id === state.senderId ? " is-active" : ""),
+      text: `${s.emoji} ${s.name}${s.commander ? " (대장님)" : ""}`,
+      on: {
+        click: () => {
+          state.senderId = s.id;
+          renderSenders();
+        },
+      },
+    });
+    els.senderPills.appendChild(chip);
+  }
+  els.senderPills.appendChild(el("button", {
+    type: "button", class: "chip add", text: "＋ 비서 추가",
+    on: { click: () => openStaffEditor(null) },
+  }));
+
+  els.mentionPills.replaceChildren();
+  els.mentionPills.appendChild(el("button", {
+    type: "button", class: "chip mention", text: "@all",
+    on: { click: () => insertMention("all") },
+  }));
+  for (const m of memberList()) {
+    els.mentionPills.appendChild(el("button", {
+      type: "button", class: "chip mention", text: "@" + m.name,
+      on: { click: () => insertMention(m.name) },
+    }));
+  }
+}
+
+function insertMention(name) {
+  const value = els.chatInput.value;
+  const needsSpace = value && !value.endsWith(" ") ? " " : "";
+  els.chatInput.value = `${value}${needsSpace}@${name} `;
+  els.chatInput.focus();
+}
+
+function renderChat() {
+  const list = messagesOf(state.channel);
+  const members = memberList();
+  els.chatOnline.textContent = String(1 + members.filter((m) => m.manual || m.online).length);
+
+  const nearBottom = els.chatList.scrollHeight - els.chatList.scrollTop - els.chatList.clientHeight < 90;
+  const wasEmpty = els.chatList.childElementCount === 0;
+
+  els.chatList.replaceChildren();
   for (const m of list) {
-    if (!m || typeof m !== "object") continue;
-    const isMe = m.id === me.uid;
-    const st = statusOf(m.status);
-
-    const nameRow = el("div", { class: "member-name" }, [
-      el("span", { text: m.name || "이름 없음" }),
-      isMe ? el("span", { class: "badge-me", text: "나" }) : null,
+    const isCommander = !!m.commander;
+    const head = el("div", { class: "msg-head" }, [
+      el("span", { class: "msg-name", text: m.name || "이름 없음" }),
+      m.role ? el("span", { class: "role-badge", text: m.role }) : null,
+      el("span", { class: "msg-time", text: fmtTime(m.createdAt) }),
     ]);
 
-    const body = el("div", { class: "member-body" }, [nameRow]);
+    const bubble = el("div", { class: "msg-bubble" });
+    bubble.appendChild(mentionNode(m.text));
 
-    if (isMe) {
-      const select = el("select", {
-        class: "me-status-select",
-        attrs: { "aria-label": "내 상태 바꾸기" },
-      });
-      for (const s of STATUSES) {
-        const opt = el("option", { text: s.label, attrs: { value: s.key } });
-        if (s.key === me.status) opt.selected = true;
-        select.appendChild(opt);
-      }
-      select.addEventListener("change", () => {
-        me.status = select.value;
-        saveJSON("pjo.profile", {
-          name: me.name, emoji: me.emoji, color: me.color, status: me.status,
-        });
-        paintMe();
-        pushMe();
-        renderMembers();
-        toast(statusOf(me.status).label + "으로 바꿨습니다");
-      });
-      body.appendChild(select);
-    } else {
-      body.appendChild(el("div", { class: "member-badges" }, [
-        el("span", { class: "status-pill " + st.cls, text: st.label }),
-        m.online ? null : el("span", { class: "tag", text: "오프라인" }),
-      ]));
-    }
-
-    els.members.appendChild(el("div", {
-      class: "member" + (isMe ? " is-me" : "") + (m.online ? "" : " offline"),
-    }, [avatarNode(m.emoji, m.color, null, !!m.online), body]));
+    const row = el("div", { class: "msg-row" + (isCommander ? " mine" : "") }, [
+      avatarNode(m.emoji, m.color),
+      el("div", { class: "msg-main" }, [head, bubble]),
+    ]);
+    els.chatList.appendChild(row);
   }
 
-  els.memberCount.textContent = list.length + "명";
-  els.membersEmpty.classList.toggle("show", list.length === 0);
-  renderAssigneeOptions(list);
+  els.chatEmpty.classList.toggle("show", list.length === 0);
+  if (list.length && (wasEmpty || nearBottom)) els.chatList.scrollTop = els.chatList.scrollHeight;
 }
 
-/* ── 메모 · 공지 ──────────────────────────────────── */
-
-let firstMsgPaint = true;
-
-function messageList() {
-  return Object.entries(state.messages)
-    .map(([id, m]) => ({ id, ...m }))
-    .sort((a, b) => (a.createdAt || 0) - (b.createdAt || 0));
-}
-
-function messageNode(m) {
-  const mine = m.uid === me.uid;
-
-  const body = el("div", { class: "msg-body" }, [
-    el("div", { class: "msg-head" }, [
-      el("span", { class: "msg-name", text: m.name || "이름 없음" }),
-      el("span", { class: "msg-time", text: fmtTime(m.createdAt) }),
-    ]),
-    el("div", { class: "msg-text", text: m.text || "" }),
-  ]);
-
-  const actions = el("div", { class: "msg-actions" });
-
-  const pinBtn = el("button", {
-    type: "button",
-    class: "act-btn" + (m.pinned ? " on" : ""),
-    text: m.pinned ? "📌" : "📍",
-    attrs: {
-      title: m.pinned ? "고정 해제" : "공지로 고정",
-      "aria-label": m.pinned ? "공지 고정 해제" : "공지로 고정",
-    },
-  });
-  pinBtn.addEventListener("click", () => {
-    update(ref(db, `${roomPath}/messages/${m.id}`), { pinned: !m.pinned })
-      .catch(() => toast("변경하지 못했습니다"));
-  });
-  actions.appendChild(pinBtn);
-
-  if (mine) {
-    const delBtn = el("button", {
-      type: "button", class: "act-btn del", text: "✕",
-      attrs: { title: "내 메모 삭제", "aria-label": "내 메모 삭제" },
-    });
-    delBtn.addEventListener("click", () => {
-      if (!window.confirm("이 메모를 삭제할까요?")) return;
-      remove(ref(db, `${roomPath}/messages/${m.id}`))
-        .catch(() => toast("삭제하지 못했습니다"));
-    });
-    actions.appendChild(delBtn);
-  }
-
-  return el("div", { class: "msg" + (mine ? " mine" : "") }, [
-    avatarNode(m.emoji, m.color, 30),
-    body,
-    actions,
-  ]);
-}
-
-function renderMessages() {
-  const all = messageList();
-  const pinned = all.filter((m) => m.pinned);
-
-  els.msgCount.textContent = String(all.length);
-
-  if (pinned.length) {
-    els.pinnedWrap.hidden = false;
-    els.pinnedList.replaceChildren(...pinned.map((m) => el("div", { class: "pinned-item" }, [
-      el("span", { class: "pin-text", text: m.text || "" }),
-      el("span", { class: "pin-author", text: m.name || "" }),
-    ])));
-  } else {
-    els.pinnedWrap.hidden = true;
-    els.pinnedList.replaceChildren();
-  }
-
-  const wasEmpty = els.msgList.childElementCount === 0;
-  const nearBottom = els.msgList.scrollHeight - els.msgList.scrollTop - els.msgList.clientHeight < 90;
-
-  els.msgList.replaceChildren(...all.map((m) => messageNode(m)));
-  els.msgEmpty.classList.toggle("show", all.length === 0);
-
-  if (all.length && (firstMsgPaint || wasEmpty || nearBottom)) {
-    els.msgList.scrollTop = els.msgList.scrollHeight;
-  }
-  firstMsgPaint = false;
-}
-
-function refreshTimes() {
-  const all = messageList();
-  const nodes = els.msgList.querySelectorAll(".msg-time");
-  nodes.forEach((node, i) => {
-    if (all[i]) node.textContent = fmtTime(all[i].createdAt);
-  });
-}
-
-/* ── 할 일 ────────────────────────────────────────── */
-
-function todoList() {
-  return Object.entries(state.todos)
-    .map(([id, t]) => ({ id, ...t }))
-    .sort((a, b) => {
-      if (!!a.done !== !!b.done) return a.done ? 1 : -1;
-      const ra = (PRIORITIES[a.priority] || PRIORITIES.normal).rank;
-      const rb = (PRIORITIES[b.priority] || PRIORITIES.normal).rank;
-      if (ra !== rb) return ra - rb;
-      return (a.createdAt || 0) - (b.createdAt || 0);
-    });
-}
-
-function todoNode(t) {
-  const pri = PRIORITIES[t.priority] || PRIORITIES.normal;
-
-  const check = el("input", {
-    class: "todo-check",
-    attrs: { type: "checkbox", "aria-label": "완료 표시" },
-  });
-  check.checked = !!t.done;
-  check.addEventListener("change", () => {
-    update(ref(db, `${roomPath}/todos/${t.id}`), { done: check.checked })
-      .catch(() => toast("변경하지 못했습니다"));
-  });
-
-  const meta = el("div", { class: "todo-meta" }, [
-    el("span", { class: "tag " + pri.cls, text: pri.label }),
-    t.assignee ? el("span", { class: "tag", text: "담당 " + t.assignee }) : null,
-    t.name ? el("span", { class: "todo-author", text: t.name }) : null,
-  ]);
-
-  const del = el("button", {
-    type: "button", class: "act-btn del", text: "✕",
-    attrs: { title: "삭제", "aria-label": "할 일 삭제" },
-  });
-  del.addEventListener("click", () => {
-    if (!window.confirm("이 할 일을 삭제할까요?")) return;
-    remove(ref(db, `${roomPath}/todos/${t.id}`))
-      .catch(() => toast("삭제하지 못했습니다"));
-  });
-
-  return el("li", { class: "todo" + (t.done ? " done" : "") }, [
-    check,
-    el("div", { class: "todo-body" }, [
-      el("div", { class: "todo-title", text: t.title || "" }),
-      meta,
-    ]),
-    del,
-  ]);
-}
-
-function renderTodos() {
-  const list = todoList();
-  els.todoList.replaceChildren(...list.map((t) => todoNode(t)));
-  const done = list.filter((t) => t.done).length;
-  els.todoCount.textContent = list.length ? `${done}/${list.length}` : "0";
-  els.todoCount.title = list.length ? `완료 ${done} · 전체 ${list.length}` : "";
-  els.todoEmpty.classList.toggle("show", list.length === 0);
-}
-
-let assigneeSignature = "";
-
-function renderAssigneeOptions(list) {
-  const uniq = [...new Set(list.map((m) => m.name).filter(Boolean))];
-  const sig = uniq.join("|");
-  if (sig === assigneeSignature) return;
-  assigneeSignature = sig;
-
-  const previous = els.todoAssignee.value;
-  els.todoAssignee.replaceChildren(el("option", { text: "담당 없음", attrs: { value: "" } }));
-  for (const name of uniq) {
-    els.todoAssignee.appendChild(el("option", { text: name, attrs: { value: name } }));
-  }
-  if (previous && uniq.includes(previous)) els.todoAssignee.value = previous;
-}
-
-/* ── 실시간 구독 ──────────────────────────────────── */
-
-onValue(ref(db, ".info/connected"), (snap) => {
-  const online = snap.val() === true;
-  state.connected = online;
-  els.connDot.className = "room-dot " + (online ? "live" : "off");
-  els.connDot.title = online ? "실시간 연결됨" : "연결이 끊겼습니다 · 다시 연결 중";
-  if (online) goOnline();
-});
-
-onValue(ref(db, `${roomPath}/members`), (snap) => {
-  state.members = snap.val() || {};
-  renderMembers();
-}, (err) => {
-  console.warn("members 구독 실패", err);
-  toast("실시간 연결에 문제가 있습니다");
-});
-
-onValue(messagesRef, (snap) => {
-  state.messages = snap.val() || {};
-  renderMessages();
-}, (err) => console.warn("messages 구독 실패", err));
-
-onValue(todosRef, (snap) => {
-  state.todos = snap.val() || {};
-  renderTodos();
-}, (err) => console.warn("todos 구독 실패", err));
-
-/* ── 이벤트 ───────────────────────────────────────── */
-
-function autoGrow(node) {
-  node.style.height = "auto";
-  node.style.height = Math.min(node.scrollHeight, 140) + "px";
-}
-
-els.msgForm.addEventListener("submit", (event) => {
+els.chatForm.addEventListener("submit", (event) => {
   event.preventDefault();
-  const text = els.msgInput.value.trim();
+  const text = els.chatInput.value.trim();
   if (!text) return;
-  els.msgInput.value = "";
-  autoGrow(els.msgInput);
-  push(messagesRef, {
-    uid: me.uid,
-    name: me.name,
-    emoji: me.emoji,
-    color: me.color,
-    text: text.slice(0, MAX_MSG),
-    pinned: false,
+  const sender = currentSender();
+  els.chatInput.value = "";
+  push(ref(db, `${base}/channels/${state.channel}/messages`), {
+    uid: sender.id,
+    byUid: me.uid,
+    name: sender.name,
+    role: sender.role,
+    emoji: sender.emoji,
+    color: sender.color,
+    commander: !!sender.commander,
+    text: text.slice(0, 500),
     createdAt: serverTimestamp(),
   }).catch((err) => {
-    console.warn("메모 전송 실패", err);
-    toast("메모를 보내지 못했습니다");
+    console.warn("메시지 전송 실패", err);
+    toast("메시지를 보내지 못했습니다");
   });
 });
 
-els.msgInput.addEventListener("keydown", (event) => {
-  // 터치 기기(아이폰 등)에서는 Enter를 줄바꿈으로 둔다
-  const touch = window.matchMedia && window.matchMedia("(pointer: coarse)").matches;
-  if (event.key === "Enter" && !event.shiftKey && !event.isComposing && !touch) {
-    event.preventDefault();
-    els.msgForm.requestSubmit();
-  }
-});
-els.msgInput.addEventListener("input", () => autoGrow(els.msgInput));
+/* ── 작업실 ───────────────────────────────────────── */
 
-els.todoForm.addEventListener("submit", (event) => {
+function renderTasks() {
+  const list = Object.entries(state.tasks).map(([id, t]) => ({ id, ...t })).sort((a, b) => {
+    const rank = { doing: 0, wait: 1, done: 2 };
+    const ra = rank[a.status] ?? 1;
+    const rb = rank[b.status] ?? 1;
+    if (ra !== rb) return ra - rb;
+    return (a.createdAt || 0) - (b.createdAt || 0);
+  });
+
+  els.taskCount.textContent = String(list.length);
+  els.taskList.replaceChildren();
+
+  for (const t of list) {
+    const st = taskStatusOf(t.status);
+    const pill = el("button", {
+      type: "button",
+      class: "status-pill " + st.cls,
+      text: st.label,
+      attrs: { title: "눌러서 상태 바꾸기" },
+      on: {
+        click: () => {
+          update(ref(db, `${base}/tasks/${t.id}`), { status: st.next })
+            .catch(() => toast("상태를 바꾸지 못했습니다"));
+        },
+      },
+    });
+
+    const del = el("button", {
+      type: "button", class: "icon-btn", text: "✕",
+      attrs: { "aria-label": "할 일 삭제" },
+      on: {
+        click: () => {
+          if (!confirm("이 일을 삭제할까요?")) return;
+          remove(ref(db, `${base}/tasks/${t.id}`)).catch(() => toast("삭제하지 못했습니다"));
+        },
+      },
+    });
+
+    els.taskList.appendChild(el("li", { class: "task-item" + (t.status === "done" ? " done" : "") }, [
+      el("div", { class: "task-body" }, [
+        el("div", { class: "task-title", text: t.title || "" }),
+        el("div", { class: "task-meta" }, [
+          t.assignee ? el("span", { class: "tag", text: "담당 " + t.assignee }) : null,
+          pill,
+          t.by ? el("span", { class: "tag", text: t.by }) : null,
+        ]),
+      ]),
+      del,
+    ]));
+  }
+
+  els.taskEmpty.classList.toggle("show", list.length === 0);
+  renderAssigneeOptions();
+}
+
+let assigneeSig = "";
+function renderAssigneeOptions() {
+  const names = memberList().map((m) => m.name).filter(Boolean);
+  const uniq = [...new Set(names)];
+  const sig = uniq.join("|");
+  if (sig === assigneeSig) return;
+  assigneeSig = sig;
+  const prev = els.taskAssignee.value;
+  els.taskAssignee.replaceChildren(el("option", { text: "미정", attrs: { value: "" } }));
+  for (const name of uniq) els.taskAssignee.appendChild(el("option", { text: name, attrs: { value: name } }));
+  if (prev && uniq.includes(prev)) els.taskAssignee.value = prev;
+}
+
+els.taskForm.addEventListener("submit", (event) => {
   event.preventDefault();
-  const title = els.todoInput.value.trim();
+  const title = els.taskTitle.value.trim();
   if (!title) return;
-  const assignee = els.todoAssignee.value || "";
-  const priority = els.todoPriority.value || "normal";
-  els.todoInput.value = "";
-  push(todosRef, {
-    uid: me.uid,
-    name: me.name,
+  const sender = currentSender();
+  els.taskTitle.value = "";
+  push(tasksRef, {
     title: title.slice(0, 200),
-    assignee,
-    priority,
-    done: false,
+    assignee: els.taskAssignee.value || "",
+    status: els.taskStatus.value || "wait",
+    by: sender.commander ? `${sender.name} 대장님` : sender.name,
+    byUid: me.uid,
     createdAt: serverTimestamp(),
   }).catch((err) => {
     console.warn("할 일 추가 실패", err);
@@ -613,11 +661,322 @@ els.todoForm.addEventListener("submit", (event) => {
   });
 });
 
-els.copyRoomBtn.addEventListener("click", async () => {
-  const url = roomUrl(room);
+/* ── 비서현황 ─────────────────────────────────────── */
+
+let staffDraft = null;
+let staffEditingId = null;
+
+function openStaffEditor(id) {
+  staffEditingId = id || null;
+  const existing = id ? state.members[id] : null;
+  staffDraft = existing
+    ? {
+      name: existing.name || "", role: existing.role || "비서", emoji: existing.emoji || "🙂",
+      color: existing.color || COLORS[0], room: existing.room || "command", status: existing.status || "idle",
+    }
+    : { name: "", role: "메인 비서", emoji: "🫧", color: COLORS[0], room: "command", status: "idle" };
+
+  els.staffModalTitle.textContent = existing ? "비서 정보" : "비서 추가";
+  els.staffName.value = staffDraft.name;
+  els.staffRole.value = staffDraft.role;
+  els.staffRoom.value = staffDraft.room;
+  els.staffStatus.value = staffDraft.status;
+  els.staffDelete.hidden = !existing;
+  paintStaffDraft();
+  openModal(els.staffModal);
+  setTimeout(() => els.staffName.focus({ preventScroll: true }), 90);
+}
+
+function paintStaffDraft() {
+  els.staffPreviewAvatar.textContent = staffDraft.emoji;
+  els.staffPreviewAvatar.style.background = tint(staffDraft.color);
+  els.staffPreviewName.textContent = staffDraft.name || "이름 없음";
+  els.staffPreviewRole.textContent = staffDraft.role || "비서";
+  els.staffEmojis.querySelectorAll(".emoji-opt").forEach((b) => b.classList.toggle("sel", b.dataset.emoji === staffDraft.emoji));
+  els.staffColors.querySelectorAll(".color-opt").forEach((b) => b.classList.toggle("sel", b.dataset.color === staffDraft.color));
+}
+
+for (const emoji of EMOJIS) {
+  const b = el("button", { type: "button", class: "emoji-opt", text: emoji, attrs: { "aria-label": emoji } });
+  b.dataset.emoji = emoji;
+  b.addEventListener("click", () => { staffDraft.emoji = emoji; paintStaffDraft(); });
+  els.staffEmojis.appendChild(b);
+}
+
+for (const color of COLORS) {
+  const b = el("button", { type: "button", class: "color-opt", attrs: { "aria-label": "색 " + color } });
+  b.dataset.color = color;
+  b.style.background = color;
+  b.addEventListener("click", () => { staffDraft.color = color; paintStaffDraft(); });
+  els.staffColors.appendChild(b);
+}
+
+els.staffName.addEventListener("input", () => { staffDraft.name = els.staffName.value; paintStaffDraft(); });
+els.staffRole.addEventListener("input", () => { staffDraft.role = els.staffRole.value; paintStaffDraft(); });
+els.staffRoom.addEventListener("change", () => { staffDraft.room = els.staffRoom.value; });
+els.staffStatus.addEventListener("change", () => { staffDraft.status = els.staffStatus.value; });
+
+els.addStaffBtn.addEventListener("click", () => openStaffEditor(null));
+
+els.staffSave.addEventListener("click", () => {
+  const name = (els.staffName.value || "").trim().slice(0, 24);
+  if (!name) { toast("이름을 적어 주세요"); els.staffName.focus(); return; }
+  const payload = {
+    uid: staffEditingId || newUid(),
+    name,
+    role: (els.staffRole.value || "비서").trim().slice(0, 20) || "비서",
+    emoji: staffDraft.emoji,
+    color: staffDraft.color,
+    room: els.staffRoom.value,
+    status: els.staffStatus.value,
+    lastSeen: serverTimestamp(),
+  };
+
+  if (staffEditingId) {
+    update(memberRef(staffEditingId), payload)
+      .then(() => toast("비서 정보를 저장했습니다"))
+      .catch(() => toast("저장하지 못했습니다"));
+    if (staffEditingId === me.uid) {
+      me = { ...me, ...payload };
+      saveJSON("goorm.profile", me);
+      pushMe();
+    }
+  } else {
+    update(memberRef(payload.uid), { ...payload, manual: true })
+      .then(() => toast(`${name} 비서를 들였습니다`))
+      .catch(() => toast("추가하지 못했습니다"));
+  }
+  closeModal(els.staffModal);
+});
+
+els.staffDelete.addEventListener("click", () => {
+  if (!staffEditingId) return;
+  if (!confirm("이 비서를 목록에서 지울까요?")) return;
+  remove(memberRef(staffEditingId)).catch(() => toast("지우지 못했습니다"));
+  closeModal(els.staffModal);
+});
+
+function renderStaff() {
+  const members = memberList();
+  els.staffList.replaceChildren();
+
+  for (const m of members) {
+    const st = statusOf(m.status);
+    const ch = channelOf(m.room);
+    els.staffList.appendChild(el("div", { class: "staff-card" }, [
+      avatarNode(m.emoji, m.color, "lg"),
+      el("div", { class: "staff-main" }, [
+        el("div", { class: "staff-name" }, [
+          el("span", { text: m.name }),
+          m.id === me.uid ? el("span", { class: "tag", text: "나" }) : null,
+        ]),
+        el("div", { class: "staff-tags" }, [
+          el("span", { class: "role-badge", text: m.role || "비서" }),
+          el("span", { class: "tag", text: `${ch.emoji} ${ch.name}` }),
+          el("span", { class: "status-pill " + st.cls, text: st.label }),
+          present(m) ? el("span", { class: "tag", text: "● 접속 중" }) : null,
+        ]),
+      ]),
+      el("button", {
+        type: "button", class: "btn small", text: "수정",
+        on: { click: () => openStaffEditor(m.id) },
+      }),
+    ]));
+  }
+
+  els.staffEmpty.classList.toggle("show", members.length === 0);
+}
+
+/* ── AI한도 ───────────────────────────────────────── */
+
+function renderQuota() {
+  const members = memberList();
+  els.quotaList.replaceChildren();
+
+  let sum = 0;
+  let counted = 0;
+
+  for (const m of members) {
+    const q = state.quota[m.id] || {};
+    const percent = Number.isFinite(Number(q.percent)) ? Number(q.percent) : 0;
+    sum += percent;
+    counted += 1;
+
+    const fill = el("div", { class: "quota-fill" + (percent >= 85 ? " high" : "") });
+    fill.style.width = percent + "%";
+
+    const percentLabel = el("span", { class: "quota-percent", text: percent + "%" });
+
+    const range = el("input", {
+      attrs: { type: "range", min: "0", max: "100", step: "5", "aria-label": m.name + " 사용량" },
+    });
+    range.value = String(percent);
+    range.addEventListener("input", () => {
+      const v = Number(range.value);
+      percentLabel.textContent = v + "%";
+      fill.style.width = v + "%";
+      fill.classList.toggle("high", v >= 85);
+    });
+    range.addEventListener("change", () => {
+      update(ref(db, `${base}/quota/${m.id}`), {
+        percent: Number(range.value), updatedAt: serverTimestamp(),
+      }).catch(() => toast("한도를 저장하지 못했습니다"));
+    });
+
+    const note = el("input", {
+      attrs: { type: "text", maxlength: "80", placeholder: "메모 (예: 이번 주 70% 사용)", value: q.note || "" },
+    });
+    note.addEventListener("change", () => {
+      update(ref(db, `${base}/quota/${m.id}`), {
+        note: note.value.slice(0, 80), updatedAt: serverTimestamp(),
+      }).catch(() => toast("메모를 저장하지 못했습니다"));
+    });
+
+    els.quotaList.appendChild(el("div", { class: "quota-card" }, [
+      el("div", { class: "quota-head" }, [
+        avatarNode(m.emoji, m.color),
+        el("span", { class: "quota-name", text: m.name }),
+        percentLabel,
+      ]),
+      el("div", { class: "quota-bar" }, [fill]),
+      el("div", { class: "quota-row" }, [range, note]),
+    ]));
+  }
+
+  const avg = counted ? Math.round(sum / counted) : 0;
+  els.quotaSummary.textContent = `평균 ${avg}%`;
+  els.quotaEmpty.classList.toggle("show", members.length === 0);
+}
+
+/* ── 메모 ─────────────────────────────────────────── */
+
+function renderMemo() {
+  const list = Object.entries(state.notes).map(([id, n]) => ({ id, ...n }))
+    .sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+  const pinned = list.filter((n) => n.pinned);
+
+  els.memoCount.textContent = String(list.length);
+
+  if (pinned.length) {
+    els.pinnedBox.hidden = false;
+    els.pinnedList.replaceChildren(...pinned.map((n) => el("div", { class: "pinned-item" }, [
+      el("span", { class: "pin-text", text: n.text || "" }),
+      el("span", { class: "pin-author", text: n.name || "" }),
+    ])));
+  } else {
+    els.pinnedBox.hidden = true;
+    els.pinnedList.replaceChildren();
+  }
+
+  els.memoList.replaceChildren();
+  for (const n of list) {
+    const actions = el("div", { class: "memo-actions" }, [
+      el("button", {
+        type: "button", class: "icon-btn", text: n.pinned ? "📌" : "📍",
+        attrs: { title: n.pinned ? "고정 해제" : "공지로 고정" },
+        on: {
+          click: () => update(ref(db, `${base}/notes/${n.id}`), { pinned: !n.pinned })
+            .catch(() => toast("변경하지 못했습니다")),
+        },
+      }),
+    ]);
+
+    if (n.byUid === me.uid) {
+      actions.appendChild(el("button", {
+        type: "button", class: "icon-btn", text: "✕",
+        attrs: { title: "삭제" },
+        on: {
+          click: () => {
+            if (!confirm("이 메모를 삭제할까요?")) return;
+            remove(ref(db, `${base}/notes/${n.id}`)).catch(() => toast("삭제하지 못했습니다"));
+          },
+        },
+      }));
+    }
+
+    els.memoList.appendChild(el("li", { class: "memo-item" + (n.pinned ? " pinned" : "") }, [
+      el("div", { class: "memo-head" }, [
+        el("span", { class: "memo-author", text: n.name || "" }),
+        el("span", { class: "memo-time", text: fmtTime(n.createdAt) }),
+      ]),
+      el("div", { class: "memo-text", text: n.text || "" }),
+      actions,
+    ]));
+  }
+
+  els.memoEmpty.classList.toggle("show", list.length === 0);
+}
+
+els.memoForm.addEventListener("submit", (event) => {
+  event.preventDefault();
+  const text = els.memoInput.value.trim();
+  if (!text) return;
+  const sender = currentSender();
+  els.memoInput.value = "";
+  push(notesRef, {
+    text: text.slice(0, 500),
+    name: sender.name,
+    byUid: me.uid,
+    pinned: false,
+    createdAt: serverTimestamp(),
+  }).catch((err) => {
+    console.warn("메모 저장 실패", err);
+    toast("메모를 남기지 못했습니다");
+  });
+});
+
+/* ── 모달 공통 ────────────────────────────────────── */
+
+function openModal(node) {
+  node.hidden = false;
+  document.body.style.overflow = "hidden";
+}
+function closeModal(node) {
+  node.hidden = true;
+  if (![...document.querySelectorAll(".modal")].some((m) => !m.hidden)) document.body.style.overflow = "";
+}
+document.querySelectorAll(".modal").forEach((modal) => {
+  modal.querySelectorAll("[data-close]").forEach((b) => b.addEventListener("click", () => closeModal(modal)));
+});
+document.addEventListener("keydown", (event) => {
+  if (event.key === "Escape") {
+    document.querySelectorAll(".modal").forEach((m) => { if (!m.hidden) closeModal(m); });
+  }
+});
+
+/* ── 사무실 설정 ──────────────────────────────────── */
+
+let metaDraft = { title: "구름 비서실", owner: "Goorm" };
+
+function openOfficeModal() {
+  metaDraft = { title: state.meta.title || "구름 비서실", owner: state.meta.owner || "Goorm" };
+  els.officeTitleInput.value = metaDraft.title;
+  els.officeOwnerInput.value = metaDraft.owner;
+  els.roomLink.textContent = officeUrl(office);
+  els.officeSwitchInput.value = office === DEFAULT_OFFICE ? "" : office;
+  openModal(els.officeModal);
+}
+
+els.officeTitle.addEventListener("click", openOfficeModal);
+
+els.officeSave.addEventListener("click", () => {
+  const title = (els.officeTitleInput.value || "").trim().slice(0, 24) || "구름 비서실";
+  const owner = (els.officeOwnerInput.value || "").trim().slice(0, 16) || "Goorm";
+  update(metaRef, { title, owner }).then(() => {
+    state.meta = { ...state.meta, title, owner };
+    paintHeader();
+    renderMap();
+    renderSenders();
+    toast("사무실 이름을 저장했습니다");
+    closeModal(els.officeModal);
+  }).catch(() => toast("저장하지 못했습니다"));
+});
+
+els.copyLinkBtn.addEventListener("click", async () => {
+  const url = officeUrl(office);
   try {
     await navigator.clipboard.writeText(url);
-    toast("방 링크를 복사했습니다");
+    toast("초대 링크를 복사했습니다");
   } catch {
     const ta = document.createElement("textarea");
     ta.value = url;
@@ -625,145 +984,96 @@ els.copyRoomBtn.addEventListener("click", async () => {
     ta.style.opacity = "0";
     document.body.appendChild(ta);
     ta.select();
-    try {
-      document.execCommand("copy");
-      toast("방 링크를 복사했습니다");
-    } catch {
-      toast("복사하지 못했습니다. 주소창의 링크를 복사해 주세요");
-    }
+    try { document.execCommand("copy"); toast("초대 링크를 복사했습니다"); }
+    catch { toast("복사하지 못했습니다. 주소창의 링크를 복사해 주세요"); }
     ta.remove();
   }
 });
 
-/* 모달 공통 */
-function openModal(node) {
-  node.hidden = false;
-  document.body.style.overflow = "hidden";
-  const focusable = node.querySelector("input, select, button");
-  if (focusable) setTimeout(() => focusable.focus({ preventScroll: true }), 80);
-}
-
-function closeModal(node) {
-  node.hidden = true;
-  if (![...document.querySelectorAll(".modal")].some((m) => !m.hidden)) {
-    document.body.style.overflow = "";
-  }
-}
-
-document.querySelectorAll(".modal").forEach((modal) => {
-  modal.querySelectorAll("[data-close]").forEach((btn) => {
-    btn.addEventListener("click", () => closeModal(modal));
-  });
+els.officeSwitchBtn.addEventListener("click", () => {
+  const next = normalizeOffice(els.officeSwitchInput.value || DEFAULT_OFFICE);
+  if (next === office) { toast("이미 이 사무실에 있습니다"); return; }
+  location.href = officeUrl(next);
+});
+els.officeSwitchInput.addEventListener("keydown", (event) => {
+  if (event.key === "Enter") { event.preventDefault(); els.officeSwitchBtn.click(); }
 });
 
-document.addEventListener("keydown", (event) => {
-  if (event.key === "Escape") {
-    document.querySelectorAll(".modal").forEach((m) => {
-      if (!m.hidden) closeModal(m);
-    });
-  }
+/* ── 실시간 구독 ──────────────────────────────────── */
+
+onValue(ref(db, ".info/connected"), (snap) => {
+  const online = snap.val() === true;
+  state.connected = online;
+  els.connPill.classList.toggle("off", !online);
+  els.connText.textContent = online ? "실시간 연결" : "다시 연결 중";
+  if (online) goOnline();
 });
 
-/* 프로필 편집 */
-let draft = { ...me };
+onValue(metaRef, (snap) => {
+  state.meta = snap.val() || {};
+  paintHeader();
+  renderMap();
+  renderSenders();
+}, (err) => console.warn("meta 구독 실패", err));
 
-function paintProfileEditor() {
-  if (els.profileName.value !== draft.name) els.profileName.value = draft.name;
-  els.emojiGrid.querySelectorAll(".emoji-opt").forEach((b) => {
-    b.classList.toggle("sel", b.dataset.emoji === draft.emoji);
-  });
-  els.colorRow.querySelectorAll(".color-opt").forEach((b) => {
-    b.classList.toggle("sel", b.dataset.color === draft.color);
-  });
-  els.statusSeg.querySelectorAll(".seg-opt").forEach((b) => {
-    b.classList.toggle("sel", b.dataset.status === draft.status);
-  });
-  els.previewAvatar.textContent = draft.emoji;
-  els.previewAvatar.style.background = tint(draft.color);
-  els.previewName.textContent = draft.name || DEFAULT_NAME;
-  const st = statusOf(draft.status);
-  els.previewStatus.className = "status-pill " + st.cls;
-  els.previewStatus.textContent = st.label;
-}
-
-for (const emoji of EMOJIS) {
-  const b = el("button", { type: "button", class: "emoji-opt", text: emoji, attrs: { "aria-label": emoji } });
-  b.dataset.emoji = emoji;
-  b.addEventListener("click", () => { draft.emoji = emoji; paintProfileEditor(); });
-  els.emojiGrid.appendChild(b);
-}
-
-for (const color of COLORS) {
-  const b = el("button", { type: "button", class: "color-opt", attrs: { "aria-label": "색 " + color } });
-  b.dataset.color = color;
-  b.style.background = color;
-  b.addEventListener("click", () => { draft.color = color; paintProfileEditor(); });
-  els.colorRow.appendChild(b);
-}
-
-for (const s of STATUSES) {
-  const b = el("button", { type: "button", class: "seg-opt", text: s.label });
-  b.dataset.status = s.key;
-  b.addEventListener("click", () => { draft.status = s.key; paintProfileEditor(); });
-  els.statusSeg.appendChild(b);
-}
-
-els.profileName.addEventListener("input", () => {
-  draft.name = els.profileName.value;
-  paintProfileEditor();
+onValue(ref(db, `${base}/members`), (snap) => {
+  state.members = snap.val() || {};
+  renderMap();
+  renderStaff();
+  renderQuota();
+  renderSenders();
+  renderAssigneeOptions();
+}, (err) => {
+  console.warn("members 구독 실패", err);
+  toast("실시간 연결에 문제가 있습니다");
 });
 
-els.meBtn.addEventListener("click", () => {
-  draft = { ...me };
-  paintProfileEditor();
-  openModal(els.profileModal);
+CHANNELS.forEach((c) => {
+  onValue(ref(db, `${base}/channels/${c.id}/messages`), (snap) => {
+    state.channels[c.id] = snap.val() || {};
+    if (state.channel === c.id) renderChat();
+    if (state.tab === "map") renderMap();
+  }, (err) => console.warn(`${c.id} 구독 실패`, err));
 });
 
-els.profileSave.addEventListener("click", () => {
-  const name = (els.profileName.value || "").trim().slice(0, 24) || DEFAULT_NAME;
-  me = { ...me, name, emoji: draft.emoji, color: draft.color, status: draft.status };
-  saveJSON("pjo.profile", { name: me.name, emoji: me.emoji, color: me.color, status: me.status });
-  paintMe();
-  pushMe();
-  renderMembers();
-  closeModal(els.profileModal);
-  toast("프로필을 저장했습니다");
-});
+onValue(tasksRef, (snap) => {
+  state.tasks = snap.val() || {};
+  renderTasks();
+}, (err) => console.warn("tasks 구독 실패", err));
 
-els.profileName.addEventListener("keydown", (event) => {
-  if (event.key === "Enter") { event.preventDefault(); els.profileSave.click(); }
-});
+onValue(notesRef, (snap) => {
+  state.notes = snap.val() || {};
+  renderMemo();
+}, (err) => console.warn("notes 구독 실패", err));
 
-/* 안내 · 방 이동 */
-els.infoBtn.addEventListener("click", () => {
-  els.roomInput.value = room === DEFAULT_ROOM ? "" : room;
-  openModal(els.infoModal);
-});
-
-els.roomGo.addEventListener("click", () => {
-  const next = normalizeRoom(els.roomInput.value || DEFAULT_ROOM);
-  if (next === room) { toast("이미 이 방에 있습니다"); return; }
-  location.href = roomUrl(next);
-});
-
-els.roomInput.addEventListener("keydown", (event) => {
-  if (event.key === "Enter") { event.preventDefault(); els.roomGo.click(); }
-});
+onValue(quotaRef, (snap) => {
+  state.quota = snap.val() || {};
+  renderQuota();
+}, (err) => console.warn("quota 구독 실패", err));
 
 /* ── 시작 ─────────────────────────────────────────── */
 
-paintMe();
-renderMembers();
-renderTodos();
-autoGrow(els.msgInput);
+paintHeader();
+renderMap();
+renderSenders();
+setChannel("command");
+renderTasks();
+renderStaff();
+renderQuota();
+renderMemo();
 
-setInterval(refreshTimes, 60 * 1000);
+els.mapStage.classList.toggle("motion", state.motion);
+switchTab("map");
 
-if (isFirstVisit) {
-  setTimeout(() => {
-    draft = { ...me };
-    paintProfileEditor();
-    openModal(els.profileModal);
-    toast("이름과 상태를 정하면 다른 피클에게 보입니다");
-  }, 500);
+setInterval(() => {
+  if (state.tab === "chat") {
+    els.chatList.querySelectorAll(".msg-time").forEach((node, i) => {
+      const list = messagesOf(state.channel);
+      if (list[i]) node.textContent = fmtTime(list[i].createdAt);
+    });
+  }
+}, 60 * 1000);
+
+if (firstVisit) {
+  setTimeout(() => toast("오른쪽 위 이름을 눌러 사무실 이름을 바꿀 수 있어요"), 900);
 }

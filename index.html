@@ -3,191 +3,301 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-<meta name="theme-color" content="#f7f6f3" />
-<meta name="description" content="다른 피클들과 함께 쓰는 실시간 합동 비서실 — 상태 보드, 메모·공지, 할 일을 공유합니다." />
-<title>합동 비서실</title>
-<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E%F0%9F%A5%92%3C/text%3E%3C/svg%3E" />
+<meta name="theme-color" content="#FAF5EB" />
+<meta name="description" content="구름 비서실 — 대장님과 비서들이 방마다 실시간으로 함께 일하는 사무실." />
+<title>구름 비서실</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E%F0%9F%91%91%3C/text%3E%3C/svg%3E" />
 <link rel="stylesheet" href="style.css" />
 </head>
 <body>
 
-<header class="topbar">
-  <div class="topbar-inner">
-    <div class="brand">
-      <span class="brand-mark" aria-hidden="true">🥒</span>
-      <div class="brand-text">
-        <h1>합동 비서실</h1>
-        <p class="brand-sub">다른 피클들과 함께 쓰는 실시간 사무실</p>
-      </div>
+<header class="app-header">
+  <div class="brand">
+    <div class="crest" aria-hidden="true">👑</div>
+    <div class="brand-text">
+      <h1 id="officeTitle" title="눌러서 이름 바꾸기">구름 비서실</h1>
+      <p class="owner"><span class="owner-dot"></span><span id="ownerName">Goorm</span>님 전용</p>
     </div>
-
-    <div class="topbar-right">
-      <div class="room-chip" title="지금 이 방의 코드">
-        <span class="room-dot" id="connDot" aria-hidden="true"></span>
-        <span class="room-hash">#</span>
-        <span class="room-name" id="roomName">main-office</span>
-        <button type="button" class="icon-btn" id="copyRoomBtn" aria-label="방 링크 복사" title="방 링크 복사">링크 복사</button>
-      </div>
-      <button type="button" class="me-btn" id="meBtn" aria-label="내 프로필 설정">
-        <span class="me-avatar" id="meAvatar">🙂</span>
-        <span class="me-meta">
-          <span class="me-name" id="meName">goorma_1</span>
-          <span class="me-status" id="meStatus">대기 중</span>
-        </span>
-      </button>
-    </div>
+  </div>
+  <div class="conn-pill" id="connPill">
+    <span class="conn-dot"></span><span id="connText">실시간 연결</span>
   </div>
 </header>
 
-<main class="layout">
+<nav class="tabs" id="tabs" aria-label="메뉴">
+  <button type="button" class="tab is-active" data-tab="map"><span class="tab-emoji">🗺️</span><span>오피스 맵</span></button>
+  <button type="button" class="tab" data-tab="chat"><span class="tab-emoji">💬</span><span>회의실</span></button>
+  <button type="button" class="tab" data-tab="tasks"><span class="tab-emoji">📋</span><span>작업실</span></button>
+  <button type="button" class="tab" data-tab="staff"><span class="tab-emoji">📊</span><span>비서현황</span></button>
+  <button type="button" class="tab" data-tab="quota"><span class="tab-emoji">⚡</span><span>AI한도</span></button>
+  <button type="button" class="tab" data-tab="memo"><span class="tab-emoji">📝</span><span>메모</span></button>
+</nav>
 
-  <!-- 구성원 · 상태 보드 -->
-  <section class="card members-card" aria-labelledby="membersTitle">
-    <div class="card-head">
-      <h2 id="membersTitle">우리들 <span class="sub">실시간 상태</span></h2>
-      <span class="count" id="memberCount">0명</span>
+<main class="app-main">
+
+  <!-- ── 오피스 맵 ─────────────────────────────────── -->
+  <section class="view is-active" id="view-map" data-view="map">
+    <div class="banner">
+      <span class="banner-tag">👑 <span id="bannerOffice">구름 비서실</span> 본부</span>
+      <h2 id="bannerTitle">대장님, 비서 0명이 대기 중이에요</h2>
+      <p>방을 눌러 들어가 보세요. 방마다 비서들이 일하고 있어요.</p>
     </div>
-    <div class="members" id="members"></div>
-    <div class="empty" id="membersEmpty">아직 아무도 없습니다. 내 상태를 골라 문을 열어 보세요.</div>
+
+    <div class="map-toolbar">
+      <div class="seg-pills" id="mapStyle">
+        <button type="button" class="pill is-active" data-style="basic">🗺️ 기본</button>
+        <button type="button" class="pill" data-style="clay">🧸 클레이</button>
+      </div>
+      <button type="button" class="pill motion is-active" id="motionToggle">✨ 움직임 ON</button>
+    </div>
+
+    <div class="counters">
+      <span class="counter"><span class="dot green"></span><span id="roomCounter">3개 방 가동</span></span>
+      <span class="counter">👥 <span id="onlineCounter">ON 0명</span></span>
+    </div>
+
+    <div class="map-stage" id="mapStage">
+      <img class="map-image" src="office-map.png" alt="나무 책상과 회의실, 라운지가 있는 아늑한 비서실 오피스" />
+      <div class="map-grain" aria-hidden="true"></div>
+
+      <button type="button" class="room-badge badge-meeting" data-channel="meeting">
+        🏛️ 대회의실 <span class="badge-count" data-count="meeting">0</span>
+      </button>
+      <button type="button" class="room-badge badge-command" data-channel="command">
+        🎯 지휘실 <span class="badge-count" data-count="command">0</span>
+      </button>
+      <button type="button" class="room-badge badge-lounge" data-channel="lounge">
+        ☕ 라운지 <span class="badge-count" data-count="lounge">0</span>
+      </button>
+
+      <div class="map-avatars" id="mapAvatars"></div>
+    </div>
+
+    <p class="map-hint">방 배지를 누르면 그 방의 회의실로 들어갑니다.</p>
   </section>
 
-  <div class="columns">
+  <!-- ── 회의실 ────────────────────────────────────── -->
+  <section class="view" id="view-chat" data-view="chat">
+    <div class="seg-pills room-switch" id="channelPills">
+      <button type="button" class="pill is-active" data-channel="meeting">🏛️ 대회의실</button>
+      <button type="button" class="pill" data-channel="command">🎯 지휘실</button>
+      <button type="button" class="pill" data-channel="lounge">☕ 라운지</button>
+    </div>
 
-    <!-- 메모 · 공지 -->
-    <section class="card messages-card" aria-labelledby="messagesTitle">
-      <div class="card-head">
-        <h2 id="messagesTitle">메모 · 공지</h2>
-        <span class="count" id="msgCount">0</span>
+    <div class="chat-status">
+      <span class="live-emoji" id="chatRoomEmoji">🎯</span>
+      <span id="chatRoomName">지휘실</span>
+      <span class="chat-sep">·</span>
+      <span class="chat-online"><span class="dot green"></span> ON <span id="chatOnline">0</span>명</span>
+    </div>
+
+    <div class="chat-list" id="chatList" aria-live="polite"></div>
+    <div class="empty-block" id="chatEmpty">아직 대화가 없습니다. 첫 말을 건네 보세요.</div>
+
+    <form class="composer" id="chatForm" autocomplete="off">
+      <div class="composer-row">
+        <span class="composer-label">발신</span>
+        <div class="pill-scroll" id="senderPills"></div>
       </div>
-
-      <div class="pinned" id="pinnedWrap" hidden>
-        <div class="pinned-label">📌 고정된 공지</div>
-        <div id="pinnedList" class="pinned-list"></div>
+      <div class="composer-row">
+        <span class="composer-label">@멘션</span>
+        <div class="pill-scroll" id="mentionPills"></div>
       </div>
-
-      <div class="msg-list" id="msgList" aria-live="polite"></div>
-      <div class="empty" id="msgEmpty">아직 남긴 메모가 없습니다. 첫 메모를 남겨 보세요.</div>
-
-      <form class="composer" id="msgForm" autocomplete="off">
-        <label class="sr-only" for="msgInput">메모 내용</label>
-        <textarea id="msgInput" rows="1" maxlength="1000" placeholder="메모나 공지를 남겨 보세요 (Enter 전송 · Shift+Enter 줄바꿈)"></textarea>
-        <button type="submit" class="btn primary" id="msgSend">보내기</button>
-      </form>
-    </section>
-
-    <!-- 할 일 -->
-    <section class="card todos-card" aria-labelledby="todosTitle">
-      <div class="card-head">
-        <h2 id="todosTitle">할 일</h2>
-        <span class="count" id="todoCount">0</span>
+      <div class="composer-input">
+        <label class="sr-only" for="chatInput">메시지</label>
+        <input id="chatInput" type="text" maxlength="500" placeholder="메시지를 입력하세요" />
+        <button type="submit" class="send-btn" aria-label="보내기">➤</button>
       </div>
+    </form>
+  </section>
 
-      <form class="todo-form" id="todoForm" autocomplete="off">
-        <label class="sr-only" for="todoInput">할 일 내용</label>
-        <input id="todoInput" type="text" maxlength="200" placeholder="할 일을 적고 Enter" />
-        <div class="todo-form-row">
-          <label class="field">
-            <span class="field-label">담당</span>
-            <select id="todoAssignee"></select>
-          </label>
-          <label class="field">
-            <span class="field-label">중요도</span>
-            <select id="todoPriority">
-              <option value="high">높음</option>
-              <option value="normal" selected>보통</option>
-              <option value="low">낮음</option>
-            </select>
-          </label>
-          <button type="submit" class="btn primary small">추가</button>
-        </div>
-      </form>
+  <!-- ── 작업실 ────────────────────────────────────── -->
+  <section class="view" id="view-tasks" data-view="tasks">
+    <div class="section-title">
+      <h2>📋 작업실</h2>
+      <span class="count-chip" id="taskCount">0</span>
+    </div>
 
-      <ul class="todo-list" id="todoList" aria-live="polite"></ul>
-      <div class="empty" id="todoEmpty">공유 할 일이 비어 있습니다.</div>
-    </section>
+    <form class="form-card" id="taskForm" autocomplete="off">
+      <label class="sr-only" for="taskTitle">할 일</label>
+      <input id="taskTitle" type="text" maxlength="200" placeholder="지시할 일을 적어 주세요" />
+      <div class="form-row">
+        <label class="field">
+          <span class="field-label">담당</span>
+          <select id="taskAssignee"></select>
+        </label>
+        <label class="field">
+          <span class="field-label">상태</span>
+          <select id="taskStatus">
+            <option value="wait">대기</option>
+            <option value="doing">실행 중</option>
+            <option value="done">완료</option>
+          </select>
+        </label>
+        <button type="submit" class="btn brown">추가</button>
+      </div>
+    </form>
 
-  </div>
+    <ul class="task-list" id="taskList" aria-live="polite"></ul>
+    <div class="empty-block" id="taskEmpty">아직 지시된 일이 없습니다.</div>
+  </section>
+
+  <!-- ── 비서현황 ──────────────────────────────────── -->
+  <section class="view" id="view-staff" data-view="staff">
+    <div class="section-title">
+      <h2>📊 비서현황</h2>
+      <button type="button" class="btn small brown" id="addStaffBtn">＋ 비서 추가</button>
+    </div>
+    <p class="section-sub">이름·역할·있는 방·상태를 정하면 오피스 맵과 회의실에 바로 반영됩니다.</p>
+    <div class="staff-list" id="staffList"></div>
+    <div class="empty-block" id="staffEmpty">아직 등록된 비서가 없습니다. ＋ 비서 추가로 시작해 보세요.</div>
+  </section>
+
+  <!-- ── AI한도 ────────────────────────────────────── -->
+  <section class="view" id="view-quota" data-view="quota">
+    <div class="section-title">
+      <h2>⚡ AI한도</h2>
+      <span class="count-chip" id="quotaSummary">0%</span>
+    </div>
+    <p class="section-sub">비서별 사용량과 메모를 실시간으로 공유합니다. 값은 직접 조정할 수 있습니다.</p>
+    <div class="quota-list" id="quotaList"></div>
+    <div class="empty-block" id="quotaEmpty">비서를 등록하면 여기에 한도가 표시됩니다.</div>
+  </section>
+
+  <!-- ── 메모 ──────────────────────────────────────── -->
+  <section class="view" id="view-memo" data-view="memo">
+    <div class="section-title">
+      <h2>📝 메모</h2>
+      <span class="count-chip" id="memoCount">0</span>
+    </div>
+
+    <div class="pinned-box" id="pinnedBox" hidden>
+      <div class="pinned-label">📌 고정된 공지</div>
+      <div id="pinnedList"></div>
+    </div>
+
+    <form class="form-card memo-form" id="memoForm" autocomplete="off">
+      <label class="sr-only" for="memoInput">메모</label>
+      <input id="memoInput" type="text" maxlength="500" placeholder="공유할 메모나 공지를 적어 주세요" />
+      <button type="submit" class="btn brown">남기기</button>
+    </form>
+
+    <ul class="memo-list" id="memoList" aria-live="polite"></ul>
+    <div class="empty-block" id="memoEmpty">아직 메모가 없습니다.</div>
+  </section>
+
 </main>
 
-<footer class="footer">
-  <span class="footer-brand">🥒 합동 비서실</span>
-  <span class="footer-sep">·</span>
-  <button type="button" class="link-btn" id="infoBtn">Firebase 테스트 모드로 운영 중 (2026-12-28까지)</button>
-</footer>
-
-<!-- 내 프로필 -->
-<div class="modal" id="profileModal" hidden>
+<!-- 비서 편집 -->
+<div class="modal" id="staffModal" hidden>
   <div class="modal-backdrop" data-close></div>
-  <div class="modal-panel" role="dialog" aria-modal="true" aria-labelledby="profileTitle">
+  <div class="modal-panel" role="dialog" aria-modal="true" aria-labelledby="staffModalTitle">
     <div class="modal-head">
-      <h2 id="profileTitle">내 프로필</h2>
-      <button type="button" class="icon-btn close" data-close aria-label="닫기">✕</button>
+      <h2 id="staffModalTitle">비서 추가</h2>
+      <button type="button" class="icon-btn" data-close aria-label="닫기">✕</button>
     </div>
     <div class="modal-body">
       <label class="field block">
         <span class="field-label">이름</span>
-        <input id="profileName" type="text" maxlength="24" placeholder="예: goorma_1" />
+        <input id="staffName" type="text" maxlength="24" placeholder="예: goorma_1" />
       </label>
-
+      <label class="field block">
+        <span class="field-label">역할</span>
+        <input id="staffRole" type="text" maxlength="20" placeholder="예: 메인 비서" list="roleHints" />
+        <datalist id="roleHints">
+          <option value="메인 비서"></option>
+          <option value="협력 비서"></option>
+          <option value="서브 비서"></option>
+          <option value="막내 비서"></option>
+        </datalist>
+      </label>
       <div class="field block">
         <span class="field-label">얼굴</span>
-        <div class="emoji-grid" id="emojiGrid"></div>
+        <div class="emoji-grid" id="staffEmojis"></div>
       </div>
-
       <div class="field block">
         <span class="field-label">색</span>
-        <div class="color-row" id="colorRow"></div>
+        <div class="color-row" id="staffColors"></div>
       </div>
-
-      <div class="field block">
-        <span class="field-label">지금 상태</span>
-        <div class="seg" id="statusSeg"></div>
+      <div class="form-row">
+        <label class="field">
+          <span class="field-label">있는 방</span>
+          <select id="staffRoom">
+            <option value="meeting">대회의실</option>
+            <option value="command">지휘실</option>
+            <option value="lounge">라운지</option>
+          </select>
+        </label>
+        <label class="field">
+          <span class="field-label">상태</span>
+          <select id="staffStatus">
+            <option value="idle">대기 중</option>
+            <option value="working">업무 중</option>
+            <option value="meeting">회의 중</option>
+            <option value="rest">휴식 중</option>
+          </select>
+        </label>
       </div>
-
-      <div class="preview" id="profilePreview">
-        <span class="me-avatar" id="previewAvatar">🙂</span>
-        <span class="preview-name" id="previewName">goorma_1</span>
-        <span class="status-pill" id="previewStatus">대기 중</span>
+      <div class="preview">
+        <span class="avatar lg" id="staffPreviewAvatar">🙂</span>
+        <span class="preview-name" id="staffPreviewName">goorma_1</span>
+        <span class="role-badge" id="staffPreviewRole">메인 비서</span>
       </div>
     </div>
     <div class="modal-foot">
+      <button type="button" class="btn ghost danger" id="staffDelete" hidden>삭제</button>
+      <span class="spacer"></span>
       <button type="button" class="btn ghost" data-close>취소</button>
-      <button type="button" class="btn primary" id="profileSave">저장</button>
+      <button type="button" class="btn brown" id="staffSave">저장</button>
     </div>
   </div>
 </div>
 
-<!-- 안내 -->
-<div class="modal" id="infoModal" hidden>
+<!-- 사무실 설정 -->
+<div class="modal" id="officeModal" hidden>
   <div class="modal-backdrop" data-close></div>
-  <div class="modal-panel" role="dialog" aria-modal="true" aria-labelledby="infoTitle">
+  <div class="modal-panel" role="dialog" aria-modal="true" aria-labelledby="officeModalTitle">
     <div class="modal-head">
-      <h2 id="infoTitle">합동 비서실 안내</h2>
-      <button type="button" class="icon-btn close" data-close aria-label="닫기">✕</button>
+      <h2 id="officeModalTitle">사무실 설정</h2>
+      <button type="button" class="icon-btn" data-close aria-label="닫기">✕</button>
     </div>
-    <div class="modal-body prose">
-      <p><strong>한 방에서 함께 일합니다.</strong> 상태 보드, 메모·공지, 할 일이 실시간으로 모든 참여자에게 동기화됩니다.</p>
+    <div class="modal-body">
+      <label class="field block">
+        <span class="field-label">사무실 이름</span>
+        <input id="officeTitleInput" type="text" maxlength="24" placeholder="구름 비서실" />
+      </label>
+      <label class="field block">
+        <span class="field-label">대장님 이름</span>
+        <input id="officeOwnerInput" type="text" maxlength="16" placeholder="Goorm" />
+      </label>
 
-      <h3>다른 피클 초대하기</h3>
-      <p>위쪽 <em>링크 복사</em> 버튼을 누르면 지금 방의 주소가 복사됩니다. 그 링크를 그대로 건네면 상대는 같은 방으로 들어옵니다. 주소 끝의 <code>?room=방이름</code>만 바꾸면 다른 방도 만들 수 있습니다.</p>
-
-      <div class="room-switch">
-        <label class="field">
-          <span class="field-label">다른 방으로 이동</span>
-          <input id="roomInput" type="text" maxlength="40" placeholder="예: team-b" />
-        </label>
-        <button type="button" class="btn" id="roomGo">이동</button>
+      <div class="room-switch-card">
+        <div class="room-switch-head">
+          <span>초대 링크</span>
+          <button type="button" class="btn small" id="copyLinkBtn">링크 복사</button>
+        </div>
+        <code id="roomLink">…</code>
+        <p class="hint">이 링크를 다른 피클에게 건네면 같은 사무실로 들어옵니다. 주소 끝 <code>?office=</code> 값만 바꾸면 다른 사무실이 됩니다.</p>
       </div>
 
-      <h3>데이터</h3>
-      <p>Firebase Realtime Database의 <code>rooms/&lt;방이름&gt;/…</code> 아래에 저장됩니다. 방 코드가 다르면 데이터도 완전히 분리됩니다.</p>
+      <div class="room-switch-card">
+        <div class="room-switch-head"><span>다른 사무실로 이동</span></div>
+        <div class="inline-form">
+          <input id="officeSwitchInput" type="text" maxlength="40" placeholder="예: team-b" />
+          <button type="button" class="btn" id="officeSwitchBtn">이동</button>
+        </div>
+      </div>
 
-      <h3>테스트 모드 (중요)</h3>
-      <p class="warn">지금은 Firebase <strong>테스트 모드</strong> 규칙이 켜져 있어 <strong>2026년 12월 28일</strong>까지 누구나 읽고 쓸 수 있습니다. 그날이 지나면 규칙이 만료되어 연결이 끊기므로, 계속 쓰려면 Firebase 콘솔 → Realtime Database → 규칙에서 만료일을 늘리거나 보안 규칙을 정해야 합니다.</p>
-      <p class="warn">그때까지는 링크를 아는 사람이면 누구나 이 방의 내용을 읽고 쓸 수 있습니다. 비밀번호·주민등록번호·카드번호 같은 민감한 정보는 적지 마세요.</p>
+      <div class="notice">
+        <strong>Firebase 테스트 모드</strong>
+        <p>지금은 테스트 모드 규칙으로 <strong>2026년 12월 28일</strong>까지 누구나 읽고 쓸 수 있습니다. 그 뒤로는 Firebase 콘솔에서 규칙 만료일을 늘리거나 보안 규칙을 정해야 연결이 유지됩니다.</p>
+        <p>링크를 아는 사람은 이 사무실의 내용을 읽고 쓸 수 있으니, 비밀번호·주민등록번호·카드번호 같은 민감한 정보는 적지 마세요.</p>
+      </div>
     </div>
     <div class="modal-foot">
-      <button type="button" class="btn primary" data-close>알겠습니다</button>
+      <span class="spacer"></span>
+      <button type="button" class="btn ghost" data-close>취소</button>
+      <button type="button" class="btn brown" id="officeSave">저장</button>
     </div>
   </div>
 </div>
