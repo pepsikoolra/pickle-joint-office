@@ -292,26 +292,6 @@ select { appearance: none; -webkit-appearance: none; padding-right: 30px;
 }
 .map-stage.clay .map-grain { opacity: .35; }
 
-.room-badge {
-  position: absolute; z-index: 3;
-  display: inline-flex; align-items: center; gap: 5px;
-  font: inherit; font-size: 12px; font-weight: 800; color: #5c3a1a;
-  background: rgba(255, 253, 247, .94);
-  border: 1px solid rgba(255,255,255,.9);
-  padding: 8px 13px; border-radius: 999px;
-  box-shadow: 0 6px 16px -8px rgba(80,45,15,.65);
-  cursor: pointer;
-  transition: transform .12s, box-shadow .15s, background .15s;
-  white-space: nowrap;
-}
-.room-badge:hover { transform: translateY(-2px) scale(1.03); background: #fff; box-shadow: 0 10px 22px -10px rgba(80,45,15,.7); }
-.room-badge:active { transform: scale(.98); }
-.badge-count {
-  font-size: 10.5px; font-weight: 800; color: #fff;
-  background: #b98a52; border-radius: 999px;
-  padding: 1px 6px; min-width: 18px; text-align: center;
-}
-.badge-meeting, .badge-command, .badge-lounge { position: static; }
 
 .room-strip {
   position: absolute; z-index: 4; left: 50%; top: 2.6%;
