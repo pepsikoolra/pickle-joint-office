@@ -4,7 +4,6 @@
 같은 초대 링크를 가진 피클들이 하나의 사무실에서 상태·지시·대화를 공유합니다.
 
 - 라이브: https://pepsikoolra.github.io/pickle-joint-office/
-- 미리보기(즉시 사용 가능): https://raw.githack.com/pepsikoolra/pickle-joint-office/main/index.html
 - 데이터: Firebase Realtime Database (Spark 무료 플랜, `pickle-joint-office-beed8`)
 
 ## 화면
