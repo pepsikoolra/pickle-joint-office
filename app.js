@@ -583,7 +583,9 @@ els.msgForm.addEventListener("submit", (event) => {
 });
 
 els.msgInput.addEventListener("keydown", (event) => {
-  if (event.key === "Enter" && !event.shiftKey && !event.isComposing) {
+  // 터치 기기(아이폰 등)에서는 Enter를 줄바꿈으로 둔다
+  const touch = window.matchMedia && window.matchMedia("(pointer: coarse)").matches;
+  if (event.key === "Enter" && !event.shiftKey && !event.isComposing && !touch) {
     event.preventDefault();
     els.msgForm.requestSubmit();
   }
