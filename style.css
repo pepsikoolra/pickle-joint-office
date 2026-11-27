@@ -471,6 +471,7 @@ select { appearance: none; -webkit-appearance: none; padding-right: 30px;
   border-radius: var(--r); box-shadow: var(--shadow-sm);
 }
 .form-row { display: flex; gap: 8px; align-items: flex-end; }
+.form-row > .btn { flex: none; }
 
 .task-list, .memo-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
 
