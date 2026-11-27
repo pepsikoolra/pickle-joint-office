@@ -430,7 +430,7 @@ function spriteColors(color) {
 }
 
 /** 의자에 앉아 일하는 피클 */
-function workingSVG(color, idx, status) {
+function workingSVG(color, idx, status, withLegs = false) {
   const c = spriteColors(color);
   const gid = `pkg-${idx}`;
   const atWork = status === "working" || status === "meeting";
@@ -443,7 +443,17 @@ function workingSVG(color, idx, status) {
         <rect x="27.5" y="76.6" width="11" height="2.2" rx="1.1" fill="#bccbd9"/>
       </g>`
     : "";
-  return `<svg class="pk-svg pk-svg-seat" viewBox="0 0 80 108" aria-hidden="true">
+  const legs = withLegs
+    ? `<ellipse class="pk-shadow" cx="40" cy="103" rx="20" ry="4" fill="#3a2410" opacity="0.16"/>
+  <g class="pk-legs">
+    <rect x="27" y="84" width="10" height="15" rx="5" fill="${c.deep}"/>
+    <rect x="43" y="84" width="10" height="15" rx="5" fill="${c.deep}"/>
+    <ellipse cx="32" cy="99" rx="7" ry="3.4" fill="${c.deep}"/>
+    <ellipse cx="48" cy="99" rx="7" ry="3.4" fill="${c.deep}"/>
+  </g>`
+    : "";
+
+  return `<svg class="pk-svg pk-svg-seat" viewBox="0 0 80 ${withLegs ? 108 : 96}" aria-hidden="true">
   <defs>
     <linearGradient id="${gid}" x1="0" y1="0" x2="0.35" y2="1">
       <stop offset="0" stop-color="${c.light}"/>
@@ -451,13 +461,7 @@ function workingSVG(color, idx, status) {
       <stop offset="1" stop-color="${c.deep}"/>
     </linearGradient>
   </defs>
-  <ellipse class="pk-shadow" cx="40" cy="103" rx="20" ry="4" fill="#3a2410" opacity="0.16"/>
-  <g class="pk-legs">
-    <rect x="27" y="84" width="10" height="15" rx="5" fill="${c.deep}"/>
-    <rect x="43" y="84" width="10" height="15" rx="5" fill="${c.deep}"/>
-    <ellipse cx="32" cy="99" rx="7" ry="3.4" fill="${c.deep}"/>
-    <ellipse cx="48" cy="99" rx="7" ry="3.4" fill="${c.deep}"/>
-  </g>
+  ${legs}
   <g class="pk-body">
     <g class="pk-ear pk-ear-l">
       <ellipse cx="9" cy="30" rx="9" ry="3.6" transform="rotate(-40 9 30)" fill="${c.light}"/>
@@ -634,14 +638,14 @@ function paintPose(node, m, onBed, slot, walking = false) {
   const idx = slot >= 0 ? slot : 9;
   node.dataset.pose = pose;
   node.innerHTML = walking
-    ? workingSVG(m.color, idx, "idle")
+    ? workingSVG(m.color, idx, "idle", true)
     : onBed
       ? restingSVG(m.color, idx, pose)
       : workingSVG(m.color, idx, m.status);
 
   node.appendChild(el("span", { class: "pk-bubble" }, [
     el("b", { text: m.name || "피클" }),
-    el("i", { text: walking ? "🚶 이동 중" : st.bubble }),
+    el("i", { text: walking ? "🚶" : (st.bubble.split(" ")[0] || "") }),
   ]));
   if (!walking && pose === "sleep") {
     node.appendChild(el("span", { class: "pk-zzz", attrs: { "aria-hidden": "true" } }, [
