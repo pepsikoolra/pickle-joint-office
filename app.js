@@ -343,9 +343,9 @@ els.tabs.addEventListener("click", (event) => {
 /* ── 오피스 맵 ────────────────────────────────────── */
 
 const ROOM_SPOTS = {
-  meeting: [[19, 51], [26, 60], [13, 62], [22, 43], [11, 49]],
-  command: [[47, 27], [55, 31], [40, 32], [52, 40], [43, 21]],
-  lounge: [[74, 76], [83, 83], [66, 85], [78, 66], [87, 73]],
+  meeting: [[30, 46], [38, 54], [25, 57], [43, 44], [20, 51]],
+  command: [[55, 24], [63, 29], [48, 23], [60, 36], [52, 40]],
+  lounge: [[66, 69], [74, 73], [82, 69], [70, 79], [78, 79]],
 };
 
 const present = (m) => !!(m && (m.manual || m.online));
@@ -368,9 +368,7 @@ function renderMap() {
   });
 
   // 카운터
-  const roomsInUse = new Set(members.map((m) => m.room).filter(Boolean));
-  roomsInUse.add("command");
-  els.roomCounter.textContent = `${Math.max(roomsInUse.size, 1)}개 방 가동`;
+  els.roomCounter.textContent = `${CHANNELS.length}개 방 가동`;
 
   const onlineCount = 1 + members.filter((m) => m.manual || m.online).length;
   els.onlineCounter.textContent = `ON ${onlineCount}명`;
